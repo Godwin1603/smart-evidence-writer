@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alfa Hawk — AI Evidence Analysis Platform</title>
+    <meta name="description"
+        content="Alfa Hawk: AI-powered forensic evidence analysis platform by Alfa Labs. Generates structured police and legal reports with automated detection. A product of Alfa Groups.">
+    <link rel="stylesheet" href="styles.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- ═══ HEADER ═══ -->
+    <header id="app-header">
+        <div class="header-inner">
+            <div class="brand">
+                <div class="brand-icon">α</div>
+                <div>
+                    <h1>Alfa Hawk</h1>
+                    <p class="brand-tagline">AI-Powered Forensic Evidence Platform &bull; Alfa Labs</p>
+                </div>
+            </div>
+            <div class="header-badge">
+                <span class="badge-dot"></span>
+                <span>In-Memory Processing</span>
+            </div>
+        </div>
+    </header>
+
+    <main id="app-main">
+
+        <!-- ═══ UPLOAD SECTION ═══ -->
+        <section id="upload-section" class="section">
+            <div class="section-title-bar">
+                <h2>📁 Upload Evidence</h2>
+                <p>Upload image, video, or audio evidence for AI-powered forensic analysis</p>
+            </div>
+
+            <div id="drop-zone" class="drop-zone">
+                <div class="drop-zone-inner">
+                    <div class="upload-icon-large">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                    </div>
+                    <p class="drop-text">Drag &amp; drop your evidence file here</p>
+                    <p class="drop-subtext">or</p>
+                    <input type="file" id="evidenceFile" accept="image/*,video/*,audio/*" hidden>
+                    <button id="selectFileBtn" class="btn btn-primary">Browse Files</button>
+                    <p class="file-support-text">Supports: JPG, PNG, MP4, AVI, MP3, WAV &bull; Max 100MB</p>
+                </div>
+            </div>
+
+            <!-- File Info (shown after upload) -->
+            <div id="file-info" class="file-info" style="display: none;">
+                <div class="file-info-icon" id="file-type-icon">📄</div>
+                <div class="file-info-details">
+                    <span class="file-info-name" id="file-name"></span>
+                    <span class="file-info-meta" id="file-meta"></span>
+                </div>
+                <button id="removeFileBtn" class="btn btn-ghost" title="Remove file">✕</button>
+            </div>
+
+            <!-- Case Info (optional) -->
+            <details class="case-info-panel">
+                <summary>Case Information (Optional)</summary>
+                <div class="case-info-fields">
+                    <div class="field-group">
+                        <label for="caseNumber">Case Number</label>
+                        <input type="text" id="caseNumber" placeholder="e.g. CR-2026-0001">
+                    </div>
+                    <div class="field-group">
+                        <label for="officerId">Officer ID</label>
+                        <input type="text" id="officerId" placeholder="e.g. OFF-4521">
+                    </div>
+                    <div class="field-group full-width">
+                        <label for="caseDescription">Case Description</label>
+                        <input type="text" id="caseDescription" placeholder="Brief description of the case...">
+                    </div>
+                </div>
+            </details>
+
+            <!-- Analyze Button -->
+            <div class="action-bar">
+                <button id="analyzeBtn" class="btn btn-primary btn-large" disabled>
+                    <span class="btn-icon">🔍</span>
+                    <span class="btn-label">Analyze Evidence</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- ═══ PROGRESS SECTION ═══ -->
+        <section id="progress-section" class="section" style="display: none;">
+            <div class="section-title-bar">
+                <h2>⏳ Analyzing Evidence</h2>
+                <p>Processing your file with AI analysis pipeline</p>
+            </div>
+
+            <div class="progress-container">
+                <div class="progress-bar-track">
+                    <div id="progress-fill" class="progress-bar-fill" style="width: 0%"></div>
+                </div>
+                <div class="progress-info">
+                    <span id="progress-percent" class="progress-percent">0%</span>
+                    <span id="progress-message" class="progress-message">Initializing...</span>
+                </div>
+
+                <div class="progress-steps" id="progress-steps">
+                    <div class="step" data-step="upload"><span class="step-icon">📤</span> Upload</div>
+                    <div class="step" data-step="process"><span class="step-icon">⚙️</span> Process</div>
+                    <div class="step" data-step="analyze"><span class="step-icon">🧠</span> AI Analysis</div>
+                    <div class="step" data-step="report"><span class="step-icon">📋</span> Report</div>
+                    <div class="step" data-step="pdf"><span class="step-icon">📄</span> PDF</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ ERROR SECTION ═══ -->
+        <section id="error-section" class="section section-error" style="display: none;">
+            <div class="error-content">
+                <div class="error-icon">⚠️</div>
+                <h3>Analysis Error</h3>
+                <p id="error-message"></p>
+                <button id="retryBtn" class="btn btn-primary">Try Again</button>
+            </div>
+        </section>
+
+        <!-- ═══ REPORT SECTION ═══ -->
+        <section id="report-section" class="section" style="display: none;">
+            <div class="section-title-bar">
+                <h2>📋 Evidence Analysis Report</h2>
+                <p>AI-generated structured forensic evidence report</p>
+            </div>
+
+            <!-- Report Actions -->
+            <div class="report-actions">
+                <button id="downloadPdfBtn" class="btn btn-primary">
+                    <span class="btn-icon">📄</span> Download PDF Report
+                </button>
+                <button id="newAnalysisBtn" class="btn btn-secondary">
+                    <span class="btn-icon">🔄</span> New Analysis
+                </button>
+            </div>
+
+            <!-- Report Content -->
+            <div id="report-content" class="report-document">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Evidence Frames Gallery -->
+            <div id="frames-gallery" class="frames-gallery" style="display: none;">
+                <h3 class="gallery-title">📸 Extracted Evidence Frames</h3>
+                <div id="frames-grid" class="frames-grid">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ═══ FOOTER ═══ -->
+    <footer>
+        <p>Alfa Hawk &bull; AI-Powered Forensic Evidence Platform &bull; Developed by Alfa Labs &bull; A Product of
+            Alfa Groups &bull; All data processed in-memory only</p>
+    </footer>
+
+    <!-- Lightbox for enlarged frame viewing -->
+    <div id="lightbox" class="lightbox" style="display: none;">
+        <div class="lightbox-overlay"></div>
+        <div class="lightbox-content">
+            <button class="lightbox-close">&times;</button>
+            <img id="lightbox-img" src="" alt="Evidence frame">
+            <p id="lightbox-caption" class="lightbox-caption"></p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
