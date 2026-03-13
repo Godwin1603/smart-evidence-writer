@@ -32,7 +32,7 @@ Designed with privacy at its core: **all processing is strictly in-memory** — 
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/smart-evidence-writer.git
+   git clone https://github.com/Godwin1603/smart-evidence-writer.git
    cd smart-evidence-writer
    ```
 
