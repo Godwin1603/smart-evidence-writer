@@ -4,6 +4,22 @@ import tempfile
 import cv2
 
 
+def _open_video_capture(path):
+    """Try stable OpenCV backends in order to avoid platform-specific decoder issues."""
+    backends = [cv2.CAP_FFMPEG]
+    msmf_backend = getattr(cv2, 'CAP_MSMF', None)
+    if msmf_backend is not None:
+        backends.append(msmf_backend)
+    backends.append(None)
+
+    for backend in backends:
+        cap = cv2.VideoCapture(path) if backend is None else cv2.VideoCapture(path, backend)
+        if cap.isOpened():
+            return cap
+        cap.release()
+    return cv2.VideoCapture()
+
+
 def validate_media_safety(file_bytes, filename, platform_limits):
     """Validate file extension, size, and basic video safety constraints."""
     ext = os.path.splitext(filename)[1].lower()
@@ -20,7 +36,7 @@ def validate_media_safety(file_bytes, filename, platform_limits):
             with open(tmp_path, 'wb') as tmp:
                 tmp.write(file_bytes)
 
-            cap = cv2.VideoCapture(tmp_path)
+            cap = _open_video_capture(tmp_path)
             if not cap.isOpened():
                 return False, "Failed to decode video file. Malformed or unsupported codec."
 

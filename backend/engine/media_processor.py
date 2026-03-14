@@ -12,6 +12,27 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 
+def _open_video_capture(path):
+    """Try stable OpenCV backends in order to avoid platform-specific decoder issues."""
+    try:
+        import cv2
+    except ImportError:
+        return None
+
+    backends = [cv2.CAP_FFMPEG]
+    msmf_backend = getattr(cv2, 'CAP_MSMF', None)
+    if msmf_backend is not None:
+        backends.append(msmf_backend)
+    backends.append(None)
+
+    for backend in backends:
+        cap = cv2.VideoCapture(path) if backend is None else cv2.VideoCapture(path, backend)
+        if cap.isOpened():
+            return cap
+        cap.release()
+    return cv2.VideoCapture()
+
+
 def get_media_type(filename):
     """Determine media category from filename."""
     mime, _ = mimetypes.guess_type(filename)
@@ -138,7 +159,7 @@ def _probe_video_metadata(file_bytes):
             with open(tmp_path, 'wb') as tmp:
                 tmp.write(file_bytes)
 
-            cap = cv2.VideoCapture(tmp_path)
+            cap = _open_video_capture(tmp_path)
             if cap.isOpened():
                 meta['width'] = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                 meta['height'] = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
