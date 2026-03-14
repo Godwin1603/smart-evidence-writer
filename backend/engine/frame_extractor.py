@@ -1,4 +1,4 @@
-# utils/frame_extractor.py — OpenCV-based video frame extraction (in-memory)
+# utils/frame_extractor.py -- OpenCV-based video frame extraction (in-memory)
 import io
 import os
 import base64
@@ -22,25 +22,21 @@ def extract_key_frames(video_bytes, max_frames=20, interval_seconds=2, max_dimen
         import cv2
         import numpy as np
 
-        # Determine file extension from original filename
         ext = '.mp4'
         if original_filename:
             _, file_ext = os.path.splitext(original_filename)
             if file_ext:
                 ext = file_ext.lower()
 
-        # Write video to temp file for OpenCV (it needs a file path)
-        tmp_path = None
-        try:
-            tmp_fd, tmp_path = tempfile.mkstemp(suffix=ext)
-            with os.fdopen(tmp_fd, 'wb') as tmp:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = os.path.join(tmp_dir, f'video{ext}')
+            with open(tmp_path, 'wb') as tmp:
                 tmp.write(video_bytes)
                 tmp.flush()
 
             file_size = os.path.getsize(tmp_path)
-            logger.info(f"Temp video written: {tmp_path} ({file_size} bytes, ext={ext})")
+            logger.info("Temp video written: %s (%s bytes, ext=%s)", tmp_path, file_size, ext)
 
-            # Try opening with multiple backends
             cap = cv2.VideoCapture(tmp_path, cv2.CAP_FFMPEG)
             if not cap.isOpened():
                 logger.warning("FFMPEG backend failed, trying MSMF backend...")
@@ -51,28 +47,24 @@ def extract_key_frames(video_bytes, max_frames=20, interval_seconds=2, max_dimen
                 cap = cv2.VideoCapture(tmp_path)
 
             if not cap.isOpened():
-                logger.error(f"Could not open video file with any backend: {tmp_path} (size={file_size}, ext={ext})")
+                logger.error("Could not open video file with any backend: %s (size=%s, ext=%s)", tmp_path, file_size, ext)
                 return frames
 
-            logger.info(f"Video opened successfully — backend={cap.getBackendName()}")
+            logger.info("Video opened successfully -- backend=%s", cap.getBackendName())
 
             fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             duration = total_frames / fps if fps > 0 else 0
 
-            # Calculate frame interval
             frame_interval = int(fps * interval_seconds)
             if frame_interval < 1:
                 frame_interval = 1
 
-            # Limit total frames extracted
             frame_indices = list(range(0, total_frames, frame_interval))
             if len(frame_indices) > max_frames:
-                # Evenly space the frames
                 step = len(frame_indices) / max_frames
                 frame_indices = [frame_indices[int(i * step)] for i in range(max_frames)]
 
-            # Always include first and last frame
             if 0 not in frame_indices:
                 frame_indices.insert(0, 0)
             last_frame = max(0, total_frames - 1)
@@ -85,13 +77,11 @@ def extract_key_frames(video_bytes, max_frames=20, interval_seconds=2, max_dimen
                 if not ret:
                     continue
 
-                # Resize if needed
-                h, w = frame.shape[:2]
-                if max(h, w) > max_dimension:
-                    ratio = max_dimension / max(h, w)
-                    frame = cv2.resize(frame, (int(w * ratio), int(h * ratio)))
+                height, width = frame.shape[:2]
+                if max(height, width) > max_dimension:
+                    ratio = max_dimension / max(height, width)
+                    frame = cv2.resize(frame, (int(width * ratio), int(height * ratio)))
 
-                # Convert BGR to RGB and then to JPEG bytes
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 pil_img = Image.fromarray(frame_rgb)
                 buf = io.BytesIO()
@@ -107,23 +97,16 @@ def extract_key_frames(video_bytes, max_frames=20, interval_seconds=2, max_dimen
                     'timestamp': timestamp,
                     'timestamp_formatted': _format_timestamp(timestamp),
                     'frame_number': idx,
-                    'description': f'Frame at {_format_timestamp(timestamp)}'
+                    'description': f'Frame at {_format_timestamp(timestamp)}',
                 }
 
             cap.release()
-            logger.info(f"Extracted {len(frames)} key frames from video ({duration:.1f}s)")
-
-        finally:
-            try:
-                if tmp_path:
-                    os.unlink(tmp_path)
-            except OSError:
-                pass
+            logger.info("Extracted %s key frames from video (%.1fs)", len(frames), duration)
 
     except ImportError:
-        logger.error("OpenCV not installed — cannot extract frames")
-    except Exception as e:
-        logger.error(f"Frame extraction failed: {e}")
+        logger.error("OpenCV not installed -- cannot extract frames")
+    except Exception as exc:
+        logger.error("Frame extraction failed: %s", exc)
 
     return frames
 
@@ -139,17 +122,15 @@ def extract_scene_change_frames(video_bytes, threshold=30.0, max_frames=10, max_
         import cv2
         import numpy as np
 
-        # Determine file extension from original filename
         ext = '.mp4'
         if original_filename:
             _, file_ext = os.path.splitext(original_filename)
             if file_ext:
                 ext = file_ext.lower()
 
-        tmp_path = None
-        try:
-            tmp_fd, tmp_path = tempfile.mkstemp(suffix=ext)
-            with os.fdopen(tmp_fd, 'wb') as tmp:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = os.path.join(tmp_dir, f'video{ext}')
+            with open(tmp_path, 'wb') as tmp:
                 tmp.write(video_bytes)
                 tmp.flush()
 
@@ -188,16 +169,15 @@ def extract_scene_change_frames(video_bytes, threshold=30.0, max_frames=10, max_
 
             cap.release()
 
-            # Take top N scene changes by intensity
-            scene_changes.sort(key=lambda x: x[1], reverse=True)
+            scene_changes.sort(key=lambda item: item[1], reverse=True)
             selected = scene_changes[:max_frames]
-            selected.sort(key=lambda x: x[0])  # Sort by time
+            selected.sort(key=lambda item: item[0])
 
             for idx, intensity, frame in selected:
-                h, w = frame.shape[:2]
-                if max(h, w) > max_dimension:
-                    ratio = max_dimension / max(h, w)
-                    frame = cv2.resize(frame, (int(w * ratio), int(h * ratio)))
+                height, width = frame.shape[:2]
+                if max(height, width) > max_dimension:
+                    ratio = max_dimension / max(height, width)
+                    frame = cv2.resize(frame, (int(width * ratio), int(height * ratio)))
 
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 pil_img = Image.fromarray(frame_rgb)
@@ -215,22 +195,15 @@ def extract_scene_change_frames(video_bytes, threshold=30.0, max_frames=10, max_
                     'timestamp_formatted': _format_timestamp(timestamp),
                     'frame_number': idx,
                     'scene_change_intensity': round(intensity, 2),
-                    'description': f'Scene change at {_format_timestamp(timestamp)} (intensity: {intensity:.1f})'
+                    'description': f'Scene change at {_format_timestamp(timestamp)} (intensity: {intensity:.1f})',
                 }
 
-            logger.info(f"Detected {len(frames)} scene changes in video")
-
-        finally:
-            try:
-                if tmp_path:
-                    os.unlink(tmp_path)
-            except OSError:
-                pass
+            logger.info("Detected %s scene changes in video", len(frames))
 
     except ImportError:
-        logger.error("OpenCV not installed — cannot detect scene changes")
-    except Exception as e:
-        logger.error(f"Scene change detection failed: {e}")
+        logger.error("OpenCV not installed -- cannot detect scene changes")
+    except Exception as exc:
+        logger.error("Scene change detection failed: %s", exc)
 
     return frames
 
@@ -254,17 +227,18 @@ def image_to_frame_entry(image_bytes, filename="evidence_image"):
                 'timestamp': 0,
                 'timestamp_formatted': '00:00:00',
                 'frame_number': 0,
-                'description': f'Evidence image: {filename}'
+                'description': f'Evidence image: {filename}',
             }
         }
-    except Exception as e:
-        logger.error(f"Image conversion failed: {e}")
+    except Exception as exc:
+        logger.error("Image to frame conversion failed: %s", exc)
         return {}
 
 
 def _format_timestamp(seconds):
-    """Format seconds into HH:MM:SS."""
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    secs = int(seconds % 60)
+    """Format seconds as HH:MM:SS."""
+    seconds = int(seconds)
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"

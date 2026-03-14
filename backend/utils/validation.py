@@ -15,9 +15,9 @@ def validate_media_safety(file_bytes, filename, platform_limits):
         return False, f"File exceeds maximum size of {max_mb}MB."
 
     if ext in {'.mp4', '.mov', '.avi'}:
-        tmp_fd, tmp_path = tempfile.mkstemp(suffix=ext)
-        try:
-            with os.fdopen(tmp_fd, 'wb') as tmp:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = os.path.join(tmp_dir, f'upload{ext}')
+            with open(tmp_path, 'wb') as tmp:
                 tmp.write(file_bytes)
 
             cap = cv2.VideoCapture(tmp_path)
@@ -45,22 +45,16 @@ def validate_media_safety(file_bytes, filename, platform_limits):
                 if frames < 5:
                     return False, f"Video contains too few frames ({int(frames)})."
             cap.release()
-        finally:
-            if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
 
     if ext == '.wav':
-        tmp_fd, tmp_path = tempfile.mkstemp(suffix=ext)
-        try:
-            with os.fdopen(tmp_fd, 'wb') as tmp:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = os.path.join(tmp_dir, f'upload{ext}')
+            with open(tmp_path, 'wb') as tmp:
                 tmp.write(file_bytes)
 
             cap = cv2.VideoCapture(tmp_path)
             if cap.isOpened():
                 return False, "Uploaded WAV file appears to be malformed media."
             cap.release()
-        finally:
-            if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
 
     return True, None

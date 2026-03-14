@@ -2,14 +2,21 @@
 
 ## Deployment Overview
 
-Alfa Hawk can be deployed for local development, internal self-hosting, or hosted platform use. The current implementation ships as a Flask backend serving a static frontend.
+Alfa Hawk can be deployed for local development, internal self-hosting, or hosted platform use. The recommended public architecture separates the workstation UI from the API runtime:
+
+- Railway service rooted at `backend/`
+- Vercel project rooted at `frontend/`
+- optional second Vercel project rooted at `product-page/`
+- Cloudflare DNS:
+  - `app.alfagroups.tech` -> `cname.vercel-dns.com`
+  - `api.alfagroups.tech` -> Railway service hostname
 
 High-level runtime pattern:
 
 ```mermaid
 flowchart LR
-    U["User Browser"] --> F["Frontend UI"]
-    F --> B["Backend API Server"]
+    U["User Browser"] --> F["Vercel Frontend UI"]
+    F --> B["Railway Backend API"]
     B --> E["Evidence Processing Engine"]
     E --> G["External AI Service (Gemini)"]
 ```
@@ -29,7 +36,7 @@ Operational considerations:
 
 - sufficient RAM for in-memory evidence sessions
 - outbound access to Gemini APIs when AI analysis is enabled
-- reverse proxy for production deployments
+- reverse proxy or managed platform ingress for production deployments
 
 ## Local Development Setup
 
@@ -48,19 +55,24 @@ pip install -r backend/requirements.txt
 python backend/app.py
 ```
 
-Production command example:
+Production command example from the repo root:
 
 ```bash
 gunicorn -w 2 -b 0.0.0.0:${PORT:-5000} backend.app:app
+```
+
+When deploying Railway with `backend/` as the service root, use:
+
+```bash
+gunicorn app:app --bind 0.0.0.0:$PORT
 ```
 
 ## Cloud Deployment
 
 Typical cloud deployment layout:
 
-- reverse proxy or ingress
-- application container running Flask backend
-- static frontend served by the backend or separate web tier
+- Railway or container service running the Flask backend
+- static frontend hosted separately on Vercel
 - outbound access to AI provider APIs
 
 For hosted deployments, consider:
@@ -81,8 +93,11 @@ Known environment variables in the current codebase include:
 - `MAX_UPLOAD_SIZE`
 - `MAX_VIDEO_DURATION`
 - `GLOBAL_DAILY_LIMIT`
-- `MONTHLY_LIMIT`
-- `REQUEST_COOLDOWN_SECONDS`
+- `RATE_LIMIT_COOLDOWN`
+- `CLIENT_HOURLY_LIMIT`
+- `CLIENT_DAILY_LIMIT`
+- `IP_HOURLY_LIMIT`
+- `IP_DAILY_LIMIT`
 - `MAX_CONCURRENCY_PER_CLIENT`
 - `MAX_CONCURRENCY_PER_IP`
 
@@ -111,9 +126,10 @@ For production scaling, consider replacing in-memory state with:
 ## Deployment Recommendations
 
 - Keep upload size and duration limits enforced at both proxy and app layers.
-- Run the service behind a reverse proxy.
+- Run the service behind a reverse proxy or managed platform ingress.
 - Restrict debug endpoints in non-development environments.
-- Set `CORS_ALLOWED_ORIGINS` explicitly for split frontend/backend deployments.
-- If the frontend is hosted separately, set the UI API base through the `alfa-hawk-api-base` meta tag or `window.ALFA_HAWK_API_BASE`.
+- Set `CORS_ALLOWED_ORIGINS=https://app.alfagroups.tech` for the public frontend.
+- Keep the frontend API base pointed at `https://api.alfagroups.tech`.
 - Monitor memory pressure due to in-memory media handling.
 - Use BYO AI mode for isolated customer-controlled deployments where appropriate.
+- For Cloudflare, disable proxying on the API CNAME if Railway TLS/origin behavior requires direct origin access.

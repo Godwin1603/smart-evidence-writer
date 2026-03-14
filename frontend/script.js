@@ -18,7 +18,7 @@
     let currentFrameContext = null;
     const apiBaseMeta = document.querySelector('meta[name="alfa-hawk-api-base"]');
     const defaultApiBase = isLocalHost() ? '' : 'https://api.alfagroups.tech';
-    const apiBase = normalizeApiBase(window.ALFA_HAWK_API_BASE || apiBaseMeta?.content || defaultApiBase);
+    const API_BASE = normalizeApiBase(window.ALFA_HAWK_API_BASE || apiBaseMeta?.content || defaultApiBase);
     const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.mp4', '.mov', '.avi', '.wav']);
 
     function normalizeApiBase(value) {
@@ -30,9 +30,9 @@
     }
 
     function apiUrl(path) {
-        if (!path) return apiBase;
+        if (!path) return API_BASE;
         if (/^https?:\/\//i.test(path)) return path;
-        return `${apiBase}${path}`;
+        return `${API_BASE}${path}`;
     }
 
     // ═══════════════════════════════════════════════════

@@ -3,12 +3,20 @@ import logging
 from datetime import datetime
 import uuid
 
-from backend.reporting.hash_utils import (
-    PLATFORM_IDENTIFIER,
-    PLATFORM_NAME,
-    PLATFORM_VERSION,
-    compute_report_integrity_hash,
-)
+try:
+    from backend.reporting.hash_utils import (
+        PLATFORM_IDENTIFIER,
+        PLATFORM_NAME,
+        PLATFORM_VERSION,
+        compute_report_integrity_hash,
+    )
+except ModuleNotFoundError:
+    from reporting.hash_utils import (
+        PLATFORM_IDENTIFIER,
+        PLATFORM_NAME,
+        PLATFORM_VERSION,
+        compute_report_integrity_hash,
+    )
 
 logger = logging.getLogger(__name__)
 

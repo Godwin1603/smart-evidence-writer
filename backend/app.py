@@ -71,7 +71,9 @@ logger = logging.getLogger('alfa-hawk')
 # ─────────────────────────────────────────────────────────
 # APP SETUP
 # ─────────────────────────────────────────────────────────
-FRONTEND_DIR = os.path.join(os.path.dirname(BASE_DIR), 'frontend')
+DEFAULT_FRONTEND_DIR = os.path.join(os.path.dirname(BASE_DIR), 'frontend')
+FRONTEND_DIR = os.getenv('FRONTEND_DIR', DEFAULT_FRONTEND_DIR)
+HAS_FRONTEND_ASSETS = os.path.isdir(FRONTEND_DIR)
 DEBUG_MODE = _env_bool('FLASK_DEBUG', False)
 ENABLE_DEBUG_ROUTES = _env_bool('ENABLE_DEBUG_ROUTES', DEBUG_MODE)
 PORT = _env_int('PORT', 5000)
@@ -86,7 +88,7 @@ DEFAULT_DEV_ORIGINS = [
 ]
 DEFAULT_ALLOWED_ORIGINS = DEFAULT_PROD_ORIGINS + (DEFAULT_DEV_ORIGINS if DEBUG_MODE else [])
 
-app = Flask(__name__, static_folder=FRONTEND_DIR)
+app = Flask(__name__, static_folder=FRONTEND_DIR if HAS_FRONTEND_ASSETS else None)
 app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_SIZE_BYTES
 CORS(
     app,
@@ -142,11 +144,18 @@ start_cleanup_timer()
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
-from backend.engine.media_processor import get_media_metadata
-from backend.reporting.pdf_generator import generate_pdf
-from backend.ai_providers.gemini import GeminiProvider
-from backend.engine.evidence_engine import EvidenceEngine
-from backend.utils.validation import validate_media_safety
+try:
+    from backend.engine.media_processor import get_media_metadata
+    from backend.reporting.pdf_generator import generate_pdf
+    from backend.ai_providers.gemini import GeminiProvider
+    from backend.engine.evidence_engine import EvidenceEngine
+    from backend.utils.validation import validate_media_safety
+except ModuleNotFoundError:
+    from engine.media_processor import get_media_metadata
+    from reporting.pdf_generator import generate_pdf
+    from ai_providers.gemini import GeminiProvider
+    from engine.evidence_engine import EvidenceEngine
+    from utils.validation import validate_media_safety
 
 # ─────────────────────────────────────────────────────────
 # PLATFORM PROTECTION & USAGE TRACKING (In-Memory)
@@ -252,12 +261,20 @@ def check_limits(f):
 @app.route('/')
 def serve_frontend():
     """Serve the main frontend page."""
+    if not HAS_FRONTEND_ASSETS:
+        return jsonify({
+            'service': 'Alfa Hawk API',
+            'status': 'online',
+            'frontend': 'deployed separately',
+        })
     return send_from_directory(FRONTEND_DIR, 'index.html')
 
 
 @app.route('/<path:path>')
 def static_files(path):
     """Serve static frontend assets."""
+    if not HAS_FRONTEND_ASSETS:
+        abort(404)
     return send_from_directory(FRONTEND_DIR, path)
 
 

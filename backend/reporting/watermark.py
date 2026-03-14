@@ -2,7 +2,10 @@ from reportlab.lib.colors import HexColor, black
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 
-from backend.reporting.hash_utils import PDF_CREATOR, PDF_PRODUCER, PLATFORM_NAME, PLATFORM_VERSION
+try:
+    from backend.reporting.hash_utils import PDF_CREATOR, PDF_PRODUCER, PLATFORM_NAME, PLATFORM_VERSION
+except ModuleNotFoundError:
+    from reporting.hash_utils import PDF_CREATOR, PDF_PRODUCER, PLATFORM_NAME, PLATFORM_VERSION
 
 
 MICRO_WATERMARK_TEXT = "ALFA HAWK • ALFA HAWK • ALFA HAWK "

@@ -17,8 +17,12 @@ from reportlab.platypus import (
 from reportlab.lib import colors
 from PIL import Image as PILImage
 
-from backend.reporting.hash_utils import PDF_CREATOR, PDF_PRODUCER, PLATFORM_NAME, PLATFORM_VERSION
-from backend.reporting.watermark import apply_page_watermarks
+try:
+    from backend.reporting.hash_utils import PDF_CREATOR, PDF_PRODUCER, PLATFORM_NAME, PLATFORM_VERSION
+    from backend.reporting.watermark import apply_page_watermarks
+except ModuleNotFoundError:
+    from reporting.hash_utils import PDF_CREATOR, PDF_PRODUCER, PLATFORM_NAME, PLATFORM_VERSION
+    from reporting.watermark import apply_page_watermarks
 
 logger = logging.getLogger(__name__)
 
