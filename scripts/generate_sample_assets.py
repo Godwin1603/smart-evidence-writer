@@ -1,0 +1,64 @@
+import json
+import os
+import sys
+
+# Add project root to path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+from backend.reporting.pdf_generator import generate_pdf
+
+def create_samples():
+    example_analysis = {
+        "header": {
+            "report_title": "SAMPLE FORENSIC EVIDENCE REPORT",
+            "system_name": "Alfa Hawk — Alfa Labs",
+            "case_number": "EX-2024-001",
+            "report_id": "AH-99999",
+            "date": "2024-01-01",
+            "time": "12:00:00",
+            "officer_id": "ALFA-01",
+            "case_description": "Sample analysis demonstration of Alfa Hawk V2 forensic engine."
+        },
+        "executive_summary": "This is a sample report demonstrating the forensic clarity and structure of Alfa Hawk. The analysis depicts a simulated environment for verification purposes.",
+        "evidence_integrity": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "file_size_mb": 12.5,
+            "media_format": "MP4",
+            "resolution": "1920x1080",
+            "frame_rate": 30,
+            "duration": 15,
+            "codec": "H264",
+            "processing_timestamp": "2024-01-01 12:05:00"
+        },
+        "incident_phases": [
+            {"phase": 1, "description": "Subject enters the visual field from the left.", "time_range": "00:01 - 00:03", "severity": "low", "evidence_frame": "FR-01"}
+        ],
+        "persons_identified": [
+            {"person_id": "P1", "description": "Male, wearing a blue shirt and dark trousers.", "observed_role": "Subject", "visibility_confidence": "High", "first_seen": "00:01", "actions": ["Walking", "Looking at camera"]}
+        ],
+        "confidence_matrix": {
+            "object_detection": {"label": "High", "percent": 95},
+            "person_tracking": {"label": "Medium", "percent": 82}
+        },
+        "report_integrity_hash": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
+        "certification": {
+            "disclaimer": "This report is generated for demonstration purposes.",
+            "system": "Alfa Hawk Forensic Engine v1.0",
+            "generated_at": "2024-01-01 12:10:00"
+        }
+    }
+
+    # Save JSON
+    os.makedirs('examples', exist_ok=True)
+    with open('examples/example_analysis.json', 'w') as f:
+        json.dump(example_analysis, f, indent=2)
+    print("Created examples/example_analysis.json")
+
+    # Generate PDF
+    pdf_bytes = generate_pdf(example_analysis)
+    with open('examples/sample_report.pdf', 'wb') as f:
+        f.write(pdf_bytes)
+    print("Created examples/sample_report.pdf")
+
+if __name__ == '__main__':
+    create_samples()

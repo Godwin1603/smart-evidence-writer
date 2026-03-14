@@ -1,33 +1,36 @@
-# config.py — Configuration for Alfa Hawk
+# config.py -- Configuration for Alfa Hawk
 import os
 from dotenv import load_dotenv
 
-load_dotenv(override=True)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BASE_DIR)
 
-# --- Groq AI Configuration (Primary) ---
-GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
-GROQ_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
-GROQ_TEXT_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
+load_dotenv(os.path.join(ROOT_DIR, '.env'))
+load_dotenv(os.path.join(BASE_DIR, '.env'))
+
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 
-# --- AWS Configuration ---
-AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
-AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '')
-AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
-AWS_S3_BUCKET_NAME = os.getenv('AWS_S3_BUCKET_NAME', '')
+PORT = int(os.getenv('PORT', '5000'))
+FLASK_DEBUG = os.getenv('FLASK_DEBUG', 'false').strip().lower() in {'1', 'true', 'yes', 'on'}
+ENABLE_DEBUG_ROUTES = os.getenv('ENABLE_DEBUG_ROUTES', 'false').strip().lower() in {'1', 'true', 'yes', 'on'}
+MAX_UPLOAD_SIZE_BYTES = int(os.getenv('MAX_UPLOAD_SIZE', str(50 * 1024 * 1024)))
+MAX_VIDEO_DURATION = int(os.getenv('MAX_VIDEO_DURATION', '60'))
+GLOBAL_DAILY_LIMIT = int(os.getenv('GLOBAL_DAILY_LIMIT', '200'))
+RATE_LIMIT_COOLDOWN = int(os.getenv('RATE_LIMIT_COOLDOWN', os.getenv('REQUEST_COOLDOWN_SECONDS', '30')))
+CLIENT_HOURLY_LIMIT = int(os.getenv('CLIENT_HOURLY_LIMIT', '1'))
+CLIENT_DAILY_LIMIT = int(os.getenv('CLIENT_DAILY_LIMIT', '3'))
+IP_HOURLY_LIMIT = int(os.getenv('IP_HOURLY_LIMIT', '3'))
+IP_DAILY_LIMIT = int(os.getenv('IP_DAILY_LIMIT', '12'))
+MAX_CONCURRENCY_PER_CLIENT = int(os.getenv('MAX_CONCURRENCY_PER_CLIENT', '1'))
+MAX_CONCURRENCY_PER_IP = int(os.getenv('MAX_CONCURRENCY_PER_IP', '3'))
 
-# --- Application Settings ---
-MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB
-SESSION_TTL_SECONDS = 30 * 60  # 30 minutes auto-cleanup
+MAX_CONTENT_LENGTH = MAX_UPLOAD_SIZE_BYTES
+SESSION_TTL_SECONDS = 30 * 60
 
-# --- Supported File Types ---
 SUPPORTED_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/webp', 'image/tiff'}
 SUPPORTED_VIDEO_TYPES = {'video/mp4', 'video/avi', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/x-matroska'}
-SUPPORTED_AUDIO_TYPES = {'audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/flac', 'audio/mp4'}
+ALL_SUPPORTED_TYPES = SUPPORTED_IMAGE_TYPES | SUPPORTED_VIDEO_TYPES
 
-ALL_SUPPORTED_TYPES = SUPPORTED_IMAGE_TYPES | SUPPORTED_VIDEO_TYPES | SUPPORTED_AUDIO_TYPES
-
-# --- Frame Extraction Settings ---
-MAX_FRAMES_PER_VIDEO = 50  # Maximum key frames to extract
-FRAME_INTERVAL_SECONDS = 1  # Extract a frame every N seconds
-FRAME_MAX_DIMENSION = 1280  # Resize frames to fit within this dimension
+MAX_FRAMES_PER_VIDEO = 50
+FRAME_INTERVAL_SECONDS = 1
+FRAME_MAX_DIMENSION = 1280

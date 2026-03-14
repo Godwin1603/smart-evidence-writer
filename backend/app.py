@@ -4,15 +4,60 @@ import sys
 import io
 import uuid
 import time
+import hashlib
 import logging
 import threading
 from datetime import datetime
 
-from flask import Flask, request, jsonify, send_from_directory, Response
+from flask import Flask, request, jsonify, send_from_directory, Response, abort
 from flask_cors import CORS
 from dotenv import load_dotenv
 
-load_dotenv()
+# V2.1 Platform Readiness
+import threading
+from collections import defaultdict
+from functools import wraps
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BASE_DIR)
+
+load_dotenv(os.path.join(ROOT_DIR, '.env'))
+load_dotenv(os.path.join(BASE_DIR, '.env'))
+
+
+def _env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _env_int(name, default):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        logging.getLogger('alfa-hawk').warning(
+            "Invalid integer for %s=%r. Falling back to %s.",
+            name,
+            value,
+            default,
+        )
+        return default
+
+
+def _env_int_with_alias(primary_name, alias_name, default):
+    primary_value = os.getenv(primary_name)
+    if primary_value is not None:
+        return _env_int(primary_name, default)
+    return _env_int(alias_name, default)
+
+
+def _env_csv(name):
+    value = os.getenv(name, '')
+    return [item.strip() for item in value.split(',') if item.strip()]
 
 # ─────────────────────────────────────────────────────────
 # LOGGING
@@ -26,12 +71,27 @@ logger = logging.getLogger('alfa-hawk')
 # ─────────────────────────────────────────────────────────
 # APP SETUP
 # ─────────────────────────────────────────────────────────
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(os.path.dirname(BASE_DIR), 'frontend')
+DEBUG_MODE = _env_bool('FLASK_DEBUG', False)
+ENABLE_DEBUG_ROUTES = _env_bool('ENABLE_DEBUG_ROUTES', DEBUG_MODE)
+PORT = _env_int('PORT', 5000)
+MAX_UPLOAD_SIZE_BYTES = _env_int('MAX_UPLOAD_SIZE', 50 * 1024 * 1024)
+CORS_ALLOWED_ORIGINS = _env_csv('CORS_ALLOWED_ORIGINS')
+DEFAULT_PROD_ORIGINS = ['https://app.alfagroups.tech']
+DEFAULT_DEV_ORIGINS = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5000',
+    'http://127.0.0.1:5000',
+]
+DEFAULT_ALLOWED_ORIGINS = DEFAULT_PROD_ORIGINS + (DEFAULT_DEV_ORIGINS if DEBUG_MODE else [])
 
 app = Flask(__name__, static_folder=FRONTEND_DIR)
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB
-CORS(app)
+app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_SIZE_BYTES
+CORS(
+    app,
+    resources={r'/api/*': {'origins': CORS_ALLOWED_ORIGINS or DEFAULT_ALLOWED_ORIGINS}},
+)
 
 # ─────────────────────────────────────────────────────────
 # IN-MEMORY SESSION STORE
@@ -51,7 +111,7 @@ CORS(app)
 #   'error': str,
 # }
 sessions = {}
-sessions_lock = threading.Lock()
+sessions_lock = threading.RLock() # Changed to RLock to prevent reentrancy deadlocks
 SESSION_TTL = 30 * 60  # 30 minutes
 
 
@@ -77,17 +137,113 @@ start_cleanup_timer()
 
 
 # ─────────────────────────────────────────────────────────
-# IMPORTS — Local utils
+# IMPORTS — Local utils & Core Engine
 # ─────────────────────────────────────────────────────────
-sys.path.append(BASE_DIR)
+if ROOT_DIR not in sys.path:
+    sys.path.append(ROOT_DIR)
 
-from utils.media_processor import get_media_type, get_media_metadata, process_image, process_audio
-from utils.frame_extractor import extract_key_frames, extract_scene_change_frames, image_to_frame_entry
-from utils.ai_analyzer import analyze_image, analyze_video, analyze_video_frames, analyze_audio, is_gemini_available
-from utils.aws_analyzer import analyze_video_aws, is_aws_configured
-from utils.report_builder import build_structured_report
-from utils.pdf_generator import generate_pdf
+from backend.engine.media_processor import get_media_metadata
+from backend.reporting.pdf_generator import generate_pdf
+from backend.ai_providers.gemini import GeminiProvider
+from backend.engine.evidence_engine import EvidenceEngine
+from backend.utils.validation import validate_media_safety
 
+# ─────────────────────────────────────────────────────────
+# PLATFORM PROTECTION & USAGE TRACKING (In-Memory)
+# ─────────────────────────────────────────────────────────
+# In a production environment, use Redis for these.
+usage_stats = defaultdict(lambda: {
+    'hourly_count': 0,
+    'daily_count': 0,
+    'last_request_at': 0,
+    'last_hour_reset': datetime.now().strftime('%Y-%m-%d-%H'),
+    'last_day_reset': datetime.now().strftime('%Y-%m-%d'),
+    'active_analyses': 0
+})
+ip_usage = defaultdict(lambda: {
+    'hourly_count': 0,
+    'daily_count': 0,
+    'last_request_at': 0,
+    'last_hour_reset': datetime.now().strftime('%Y-%m-%d-%H'),
+    'last_day_reset': datetime.now().strftime('%Y-%m-%d'),
+    'active_analyses': 0
+})
+
+PLATFORM_LIMITS = {
+    'per_client_hourly_limit': _env_int('CLIENT_HOURLY_LIMIT', 1),
+    'per_client_daily_limit': _env_int('CLIENT_DAILY_LIMIT', 3),
+    'per_ip_hourly_limit': _env_int('IP_HOURLY_LIMIT', 3),
+    'per_ip_daily_limit': _env_int('IP_DAILY_LIMIT', 12),
+    'global_daily': _env_int('GLOBAL_DAILY_LIMIT', 200),
+    'cooldown_seconds': _env_int_with_alias('RATE_LIMIT_COOLDOWN', 'REQUEST_COOLDOWN_SECONDS', 30),
+    'max_concurrency_per_client': _env_int('MAX_CONCURRENCY_PER_CLIENT', 1),
+    'max_concurrency_per_ip': _env_int('MAX_CONCURRENCY_PER_IP', 3),
+    'max_video_duration': _env_int('MAX_VIDEO_DURATION', 60),  # seconds
+    'max_file_size': MAX_UPLOAD_SIZE_BYTES,
+    'min_resolution': (160, 160),
+    'allowed_extensions': {'.mp4', '.mov', '.avi', '.jpg', '.jpeg', '.png', '.wav'}
+}
+
+global_stats = {
+    'total_daily_count': 0,
+    'last_reset': datetime.now().date()
+}
+
+tracker_lock = threading.Lock()
+
+def check_limits(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        client_id = request.headers.get('X-Client-ID')
+        ip = request.remote_addr
+        now = time.time()
+        today = datetime.now().date()
+        if not client_id:
+            return jsonify({'error': 'X-Client-ID header missing'}), 400
+
+        with tracker_lock:
+            # 1. Reset counters if needed (Global daily, per-client hourly/daily, per-IP hourly/daily)
+            if global_stats['last_reset'] != today:
+                global_stats['total_daily_count'] = 0
+                global_stats['last_reset'] = today
+            
+            this_hour = datetime.now().strftime('%Y-%m-%d-%H')
+            this_day = datetime.now().strftime('%Y-%m-%d')
+            for storage in [usage_stats[client_id], ip_usage[ip]]:
+                if storage.get('last_hour_reset') != this_hour:
+                    storage['hourly_count'] = 0
+                    storage['last_hour_reset'] = this_hour
+                if storage.get('last_day_reset') != this_day:
+                    storage['daily_count'] = 0
+                    storage['last_day_reset'] = this_day
+
+            # 2. Global Platform Quota
+            if global_stats['total_daily_count'] >= PLATFORM_LIMITS['global_daily']:
+                return jsonify({'error': 'Platform daily capacity reached. Try again tomorrow.'}), 503
+
+            # 3. Cooldown check
+            if now - usage_stats[client_id]['last_request_at'] < PLATFORM_LIMITS['cooldown_seconds']:
+                wait = int(PLATFORM_LIMITS['cooldown_seconds'] - (now - usage_stats[client_id]['last_request_at']))
+                return jsonify({'error': f'Request cooldown active. Wait {wait}s.'}), 429
+
+            # 4. Hourly/Daily limits
+            if usage_stats[client_id]['hourly_count'] >= PLATFORM_LIMITS['per_client_hourly_limit']:
+                return jsonify({'error': 'Hourly analysis limit reached for this Client ID.'}), 429
+            if usage_stats[client_id]['daily_count'] >= PLATFORM_LIMITS['per_client_daily_limit']:
+                return jsonify({'error': 'Daily analysis limit reached for this Client ID.'}), 429
+            if ip_usage[ip]['hourly_count'] >= PLATFORM_LIMITS['per_ip_hourly_limit']:
+                return jsonify({'error': 'Hourly analysis limit reached for this IP.'}), 429
+            if ip_usage[ip]['daily_count'] >= PLATFORM_LIMITS['per_ip_daily_limit']:
+                return jsonify({'error': 'Daily analysis limit reached for this IP.'}), 429
+
+            # 5. Concurrency check
+            if usage_stats[client_id]['active_analyses'] >= PLATFORM_LIMITS['max_concurrency_per_client']:
+                return jsonify({'error': 'Active analysis already in progress for this Client ID.'}), 429
+            if ip_usage[ip]['active_analyses'] >= PLATFORM_LIMITS['max_concurrency_per_ip']:
+                return jsonify({'error': 'Maximum concurrent analyses reached for this IP.'}), 429
+
+        return f(*args, **kwargs)
+    return decorated_function
 
 # ═════════════════════════════════════════════════════════
 # ROUTES — Static files
@@ -110,10 +266,11 @@ def static_files(path):
 # ═════════════════════════════════════════════════════════
 
 @app.route('/api/upload', methods=['POST'])
+@check_limits
 def upload_evidence():
     """
     Upload an evidence file. Stores in memory only.
-    Returns a session_id for subsequent operations.
+    Includes launch-ready validation and platform tracking.
     """
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
@@ -122,24 +279,47 @@ def upload_evidence():
     if not file.filename:
         return jsonify({'error': 'No file selected'}), 400
 
-    # Read file into memory
     file_bytes = file.read()
-    if len(file_bytes) == 0:
+    if not file_bytes:
         return jsonify({'error': 'Empty file'}), 400
 
-    filename = file.filename
+    # 1. Deep Validation
+    valid, err_msg = validate_media_safety(file_bytes, file.filename, PLATFORM_LIMITS)
+    if not valid:
+        return jsonify({'error': err_msg}), 400
 
-    # Get metadata
-    metadata = get_media_metadata(file_bytes, filename)
+    # 2. Tracking Update (Tentative upload success)
+    client_id = request.headers.get('X-Client-ID')
+    ip = request.remote_addr
+    with tracker_lock:
+        usage_stats[client_id]['last_request_at'] = time.time()
+        ip_usage[ip]['last_request_at'] = time.time()
 
-    # Create session
+    # 3. Create Session
     session_id = str(uuid.uuid4())
+    filename = file.filename
+    evidence_hash = hashlib.sha256(file_bytes).hexdigest()
+    metadata = get_media_metadata(file_bytes, filename)
+    metadata['evidence_sha256'] = evidence_hash
 
-    # Get optional case info from form
+    # Optional BYO Key (format & live validation)
+    byo_key = request.form.get('ai_api_key', '').strip()
+    if byo_key:
+        if not byo_key.startswith('AIza'):
+            return jsonify({'error': 'Invalid Gemini API key format. Must start with "AIza".'}), 401
+        
+        # Live verification call (lightweight list models check)
+        temp_provider = GeminiProvider(api_key=byo_key)
+        if not temp_provider.verify_api_key(byo_key):
+            return jsonify({'error': 'API Key verification failed. Please check your key or quota.'}), 401
+        
+        logger.info(f"Session {session_id} using verified BYO AI key.")
+
     case_info = {
         'case_number': request.form.get('case_number', ''),
         'officer_id': request.form.get('officer_id', ''),
         'case_description': request.form.get('case_description', ''),
+        'byo_key': byo_key if byo_key else None
     }
 
     with sessions_lock:
@@ -154,36 +334,55 @@ def upload_evidence():
             'pdf_bytes': None,
             'status': 'uploaded',
             'progress': 0,
-            'progress_message': 'File uploaded successfully',
+            'progress_message': 'Evidence validated and staged in memory.',
             'created_at': time.time(),
             'error': None,
+            'tracking': {'client_id': client_id, 'ip': ip}
         }
 
-    logger.info(f"File uploaded: {filename} ({metadata['file_size_mb']} MB) → Session: {session_id}")
+    # Operational mask logging
+    masked_key = (f"{byo_key[:4]}...{byo_key[-4:]}") if byo_key else "None"
+    logger.info(f"Upload: CID={client_id[:8]}... IP={ip} BYO_KEY={masked_key}")
 
     return jsonify({
         'session_id': session_id,
         'metadata': metadata,
-        'message': 'File uploaded to memory. Ready for analysis.',
+        'mode': 'BYO Key' if byo_key else 'Platform AI',
+        'message': 'Evidence validated and staged in memory.',
     })
 
 
 @app.route('/api/analyze/<session_id>', methods=['POST'])
 def analyze_evidence_route(session_id):
     """
-    Start the full analysis pipeline for an uploaded file.
-    Runs asynchronously and updates session progress.
+    Start the full analysis pipeline using EvidenceEngine.
     """
+    client_id = request.headers.get('X-Client-ID')
+    ip = request.remote_addr
+
     with sessions_lock:
         session = sessions.get(session_id)
         if not session:
             return jsonify({'error': 'Session not found or expired'}), 404
         if session['status'] == 'analyzing':
             return jsonify({'error': 'Analysis already in progress'}), 409
+        if session.get('metadata', {}).get('media_type') == 'audio':
+            return jsonify({'error': 'WAV upload is accepted for validation, but AI analysis is not available for audio evidence in v1.0.0.'}), 400
+
+        # Update counters
+        with tracker_lock:
+            usage_stats[client_id]['hourly_count'] += 1
+            usage_stats[client_id]['daily_count'] += 1
+            ip_usage[ip]['hourly_count'] += 1
+            ip_usage[ip]['daily_count'] += 1
+            usage_stats[client_id]['active_analyses'] += 1
+            ip_usage[ip]['active_analyses'] += 1
+            global_stats['total_daily_count'] += 1
 
         session['status'] = 'analyzing'
         session['progress'] = 5
-        session['progress_message'] = 'Starting analysis pipeline...'
+        session['progress_message'] = 'Initializing Open Source Evidence Engine...'
+        session['tracking'] = {'client_id': client_id, 'ip': ip}
 
     # Run analysis in background thread
     thread = threading.Thread(target=_run_analysis_pipeline, args=(session_id,))
@@ -193,7 +392,7 @@ def analyze_evidence_route(session_id):
     return jsonify({
         'session_id': session_id,
         'status': 'analyzing',
-        'message': 'Analysis started. Poll /api/status/<session_id> for progress.',
+        'message': 'Analysis started.',
     })
 
 
@@ -319,17 +518,59 @@ def cleanup_session(session_id):
         return jsonify({'error': 'Session not found'}), 404
 
 
+@app.route('/api/usage')
+def get_usage_stats():
+    """Get usage stats for the current client."""
+    client_id = request.headers.get('X-Client-ID')
+    ip = request.remote_addr
+    
+    if not client_id:
+        return jsonify({'error': 'X-Client-ID header missing'}), 400
+
+    with tracker_lock:
+        client_stats = usage_stats[client_id]
+        ip_stats = ip_usage[ip]
+        
+        return jsonify({
+            'client_hourly_count': client_stats.get('hourly_count', 0),
+            'client_hourly_limit': PLATFORM_LIMITS['per_client_hourly_limit'],
+            'client_daily_count': client_stats.get('daily_count', 0),
+            'client_daily_limit': PLATFORM_LIMITS['per_client_daily_limit'],
+            'ip_hourly_count': ip_stats.get('hourly_count', 0),
+            'ip_hourly_limit': PLATFORM_LIMITS['per_ip_hourly_limit'],
+            'ip_daily_count': ip_stats.get('daily_count', 0),
+            'ip_daily_limit': PLATFORM_LIMITS['per_ip_daily_limit'],
+            'global_daily_count': global_stats['total_daily_count'],
+            'global_daily_limit': PLATFORM_LIMITS['global_daily']
+        })
+
+
 @app.route('/health')
 def health_check():
     """Health check endpoint."""
-    from config import GROQ_API_KEY
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
-        'ai_configured': bool(GROQ_API_KEY and GROQ_API_KEY != 'your_groq_api_key_here'),
+        'ai_configured': bool(os.getenv('GEMINI_API_KEY')),
         'active_sessions': len(sessions),
         'storage': 'in-memory only',
+        'debug_routes_enabled': ENABLE_DEBUG_ROUTES,
     })
+
+
+@app.route('/api/debug/sessions')
+def debug_sessions():
+    """Debug route to check internal session states."""
+    if not ENABLE_DEBUG_ROUTES:
+        abort(404)
+    with sessions_lock:
+        return jsonify({sid: {
+            'status': s['status'],
+            'progress': s['progress'],
+            'msg': s['progress_message'],
+            'has_report': s['report'] is not None,
+            'has_pdf': s['pdf_bytes'] is not None
+        } for sid, s in sessions.items()})
 
 
 # ═════════════════════════════════════════════════════════
@@ -338,159 +579,86 @@ def health_check():
 
 def _run_analysis_pipeline(session_id):
     """
-    Full analysis pipeline:
-    1. Process media (extract frames / transcribe audio)
-    2. AI analysis of each frame/transcript
-    3. Build structured report
-    4. Generate PDF
+    Optimized V2.1 Pipeline using EvidenceEngine and abstracted providers.
     """
+    client_id = None
+    ip = None
     try:
         with sessions_lock:
             session = sessions.get(session_id)
-            if not session:
-                return
+            if not session: return
+            file_bytes = session['file_bytes']
+            filename = session['filename']
+            case_info = session['case_info']
+            client_id = session['tracking']['client_id']
+            ip = session['tracking']['ip']
 
-        file_bytes = session['file_bytes']
-        filename = session['filename']
-        metadata = session['metadata']
-        media_type = metadata.get('media_type', 'unknown')
+        # 1. Setup Engine with abstracted provider
+        provider_key = case_info.get('byo_key') or os.getenv('GEMINI_API_KEY')
+        provider = GeminiProvider(api_key=provider_key)
+        engine = EvidenceEngine(ai_provider=provider)
 
-        # ──── STEP 1: Process media ────
-        _update_progress(session_id, 10, 'Processing media file...')
+        def progress_cb(p, m):
+            _update_progress(session_id, p, m)
 
-        frames = {}
-        transcript = None
+        # 2. Run Engine (Open Source Core logic) with 90s timeout
+        import concurrent.futures
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(
+                engine.run_analysis,
+                file_bytes=file_bytes,
+                filename=filename,
+                case_data=case_info,
+                api_key=provider_key,
+                progress_callback=progress_cb
+            )
+            try:
+                report = future.result(timeout=180) # Increased to 180s for Native Video API
+            except concurrent.futures.TimeoutError:
+                logger.error(f"Analysis Timeout {session_id}")
+                raise Exception("AI analysis timed out (180s limit reached). The evidence may be too complex or the provider is slow.")
 
-        if media_type == 'image':
-            _update_progress(session_id, 15, 'Preparing image for analysis...')
-            processed_bytes, b64 = process_image(file_bytes)
-            frames = image_to_frame_entry(file_bytes, filename)
-
-        elif media_type == 'video':
-            if is_aws_configured():
-                _update_progress(session_id, 15, 'AWS configured. Extracting high-density frames for secondary AI vision analysis...')
-                # Extract high density frames (every 0.5s) so Gemini doesn't miss split-second details
-                frames = extract_key_frames(file_bytes, max_frames=50, interval_seconds=0.5, original_filename=filename)
-                scene_frames = extract_scene_change_frames(file_bytes, original_filename=filename)
-                frames.update(scene_frames)
-                _update_progress(session_id, 20, f'{len(frames)} total frames extracted for Gemini Vision.')
-            else:
-                # Fallback to local high-density frame extraction (1-second intervals for forensic detail)
-                _update_progress(session_id, 15, 'Extracting high-density key frames from video...')
-                frames = extract_key_frames(file_bytes, original_filename=filename)
-                _update_progress(session_id, 25, f'Extracted {len(frames)} key frames. Detecting scene changes...')
-    
-                scene_frames = extract_scene_change_frames(file_bytes, original_filename=filename)
-                frames.update(scene_frames)
-                _update_progress(session_id, 30, f'Total {len(frames)} frames extracted.')
-
-        elif media_type == 'audio':
-            _update_progress(session_id, 15, 'Transcribing audio...')
-            transcript = process_audio(file_bytes, filename)
-            _update_progress(session_id, 30, 'Audio transcribed successfully.')
-
-        else:
-            _update_progress(session_id, 15, 'Unknown media type — attempting image analysis...')
-            frames = image_to_frame_entry(file_bytes, filename)
-
-        # Store frames in session
-        with sessions_lock:
-            if session_id in sessions:
-                sessions[session_id]['frames'] = frames
-
-        # ──── STEP 2: AI Analysis ────
-        _update_progress(session_id, 35, 'Running AI analysis...')
-
-        analysis = {}
-
-        if media_type == 'image':
-            _update_progress(session_id, 40, 'Analyzing image with AI vision model...')
-            # Get the single frame's base64
-            frame_data = list(frames.values())[0] if frames else None
-            if frame_data:
-                analysis = analyze_image(frame_data['base64'], metadata)
-                # Link frame_id to analysis findings
-                frame_id = list(frames.keys())[0]
-                for section in ['violations', 'accidents', 'number_plates', 'human_faces']:
-                    for item in analysis.get(section, []):
-                        item['frame_id'] = frame_id
-            _update_progress(session_id, 70, 'Image analysis complete.')
-
-        elif media_type == 'video':
-            if is_aws_configured():
-                _update_progress(session_id, 35, 'Delegating deep forensic analysis to AWS Rekognition...')
-                
-                # Pass a callback to update progress through the stages in aws_analyzer
-                def aws_progress_cb(prog, msg):
-                    _update_progress(session_id, prog, msg)
-                    
-                analysis = analyze_video_aws(file_bytes, filename, metadata, frames=frames, progress_callback=aws_progress_cb)
-                _update_progress(session_id, 70, 'AWS + Gemini Multimodal Video analysis complete.')
-            else:
-                # Fallback: Analyze frames (uses multi-frame context with Local OCR assistance)
-                total_frames = len(frames)
-                _update_progress(session_id, 40, f'Analyzing {total_frames} video frames locally with AI & Local OCR...')
-                
-                # Use top 30 frames for high detail coverage
-                frames_to_analyze = dict(list(frames.items())[:30])
-                analysis = analyze_video_frames(frames_to_analyze, metadata)
-                _update_progress(session_id, 70, 'Video frame analysis complete.')
-
-        elif media_type == 'audio':
-            _update_progress(session_id, 40, 'Analyzing audio transcript with AI...')
-            analysis = analyze_audio(transcript, metadata)
-            _update_progress(session_id, 70, 'Audio analysis complete.')
-
-        else:
-            analysis = {
-                'executive_summary': 'Unsupported media type — manual review required.',
-                'violations': [], 'accidents': [], 'number_plates': [],
-                'human_faces': [], 'landmarks': [],
-            }
+        # 3. Finalize
+        # Note: Generate PDF outside the lock to avoid blocking other requests
+        _update_progress(session_id, 90, 'Applying platform branding and generating PDF...')
+        try:
+            pdf_bytes = generate_pdf(report)
+        except Exception as pdf_err:
+            logger.error(f"PDF Generation failed for {session_id}: {pdf_err}")
+            pdf_bytes = None
 
         with sessions_lock:
             if session_id in sessions:
-                sessions[session_id]['analysis'] = analysis
-
-        # ──── STEP 3: Build structured report ────
-        _update_progress(session_id, 75, 'Building structured evidence report...')
-
-        case_info = session.get('case_info', {})
-        report = build_structured_report(analysis, metadata, frames, case_info)
-
-        with sessions_lock:
-            if session_id in sessions:
+                # Store report and PDF
                 sessions[session_id]['report'] = report
-
-        # ──── STEP 4: Generate PDF ────
-        _update_progress(session_id, 85, 'Generating PDF report...')
-
-        pdf_bytes = generate_pdf(report)
-
-        with sessions_lock:
-            if session_id in sessions:
                 sessions[session_id]['pdf_bytes'] = pdf_bytes
-
-        # ──── STEP 5: Clean up file bytes to save memory ────
-        _update_progress(session_id, 95, 'Finalizing report...')
-
-        with sessions_lock:
-            if session_id in sessions:
-                # Remove raw file bytes to free memory (keep frames and report)
-                sessions[session_id]['file_bytes'] = None
+                
+                sessions[session_id]['file_bytes'] = None # Done with raw bytes
                 sessions[session_id]['status'] = 'complete'
                 sessions[session_id]['progress'] = 100
-                sessions[session_id]['progress_message'] = 'Analysis complete! Report ready for download.'
-
-        logger.info(f"Analysis pipeline complete for session: {session_id}")
+                sessions[session_id]['progress_message'] = 'Forensic report generated successfully.'
 
     except Exception as e:
-        logger.error(f"Analysis pipeline failed for {session_id}: {e}", exc_info=True)
+        logger.error(f"Engine Failure {session_id}: {str(e)}")
+        # Mask potentially sensitive error details
+        clean_msg = str(e)
+        if "API_KEY" in clean_msg.upper() or "AIza" in clean_msg:
+            clean_msg = "AI Provider authentication error. Please check your API key."
+        
         with sessions_lock:
             if session_id in sessions:
                 sessions[session_id]['status'] = 'error'
-                sessions[session_id]['error'] = str(e)
-                sessions[session_id]['progress_message'] = f'Error: {str(e)}'
+                sessions[session_id]['error'] = clean_msg
+                sessions[session_id]['progress_message'] = f'Error: {clean_msg}'
+    finally:
+        # Decrement concurrency counters
+        if client_id and ip:
+            with tracker_lock:
+                usage_stats[client_id]['active_analyses'] = max(0, usage_stats[client_id]['active_analyses'] - 1)
+                ip_usage[ip]['active_analyses'] = max(0, ip_usage[ip]['active_analyses'] - 1)
+        
+        logger.info(f"Analysis pipeline complete for session: {session_id}")
 
 
 def _update_progress(session_id, progress, message):
@@ -513,4 +681,6 @@ if __name__ == '__main__':
     logger.info("  Storage: IN-MEMORY ONLY (no file persistence)")
     logger.info(f"  Frontend: {FRONTEND_DIR}")
     logger.info("=" * 60)
-    app.run(debug=True, port=5000, threaded=True)
+    logger.info("  Debug mode: %s", "enabled" if DEBUG_MODE else "disabled")
+    logger.info("  API origins: %s", ", ".join(CORS_ALLOWED_ORIGINS or DEFAULT_ALLOWED_ORIGINS))
+    app.run(host='0.0.0.0', debug=DEBUG_MODE, port=PORT, threaded=True)

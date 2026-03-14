@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: alfahawk-api
+    env: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: gunicorn backend.app:app
