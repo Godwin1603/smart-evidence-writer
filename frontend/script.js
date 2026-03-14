@@ -17,7 +17,7 @@
     let activeTab = 'overview';
     let currentFrameContext = null;
     const apiBaseMeta = document.querySelector('meta[name="alfa-hawk-api-base"]');
-    const defaultApiBase = isLocalHost() ? '' : 'https://api.alfagroups.tech';
+    const defaultApiBase = isLocalHost() ? '' : 'https://web-production-4c3f2.up.railway.app';
     const API_BASE = normalizeApiBase(window.ALFA_HAWK_API_BASE || apiBaseMeta?.content || defaultApiBase);
     const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.mp4', '.mov', '.avi', '.wav']);
 
