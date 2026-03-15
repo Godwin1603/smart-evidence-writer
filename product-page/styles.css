@@ -18,8 +18,8 @@
     --shadow-card: 0 12px 28px rgba(34, 40, 49, 0.08);
     --radius-sm: 10px;
     --radius-md: 18px;
-    --radius-lg: 28px;
-    --container: 1180px;
+    --radius-lg: 32px;
+    --container: 1200px;
     --font-sans: "IBM Plex Sans", sans-serif;
     --font-mono: "IBM Plex Mono", monospace;
 }
@@ -64,8 +64,9 @@ select {
 }
 
 .container {
-    width: min(var(--container), calc(100% - 3rem));
+    max-width: var(--container);
     margin: 0 auto;
+    padding: 0 24px;
 }
 
 /* Topbar */
@@ -159,25 +160,37 @@ select {
 }
 
 .button-primary {
-    background: #414e59;
+    background: #2f3e4d;
     color: #f7f5f1;
-    box-shadow: var(--shadow-card);
+    box-shadow: 0 4px 12px rgba(47, 62, 77, 0.25);
 }
 
 .button-primary:hover {
-    background: #38434d;
+    background: #25313d;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(47, 62, 77, 0.35);
 }
 
-.button-secondary,
-.button-ghost {
-    background: rgba(247, 245, 241, 0.75);
-    border-color: rgba(86, 93, 102, 0.16);
+.button-secondary {
+    background: transparent;
+    border-color: rgba(0, 0, 0, 0.15);
     color: var(--text-main);
 }
 
-.button-secondary:hover,
+.button-secondary:hover {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.3);
+}
+
+.button-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-soft);
+}
+
 .button-ghost:hover {
-    background: #ffffff;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-main);
 }
 
 .button-large {
@@ -206,7 +219,7 @@ select {
 
 /* Hero Section */
 .hero {
-    padding: 5rem 0 3.25rem;
+    padding: 3.5rem 0 4rem;
 }
 
 .hero-grid {
@@ -306,8 +319,9 @@ select {
 
 .hero h1 {
     margin-top: 1rem;
-    font-size: clamp(2.5rem, 5vw, 4.7rem);
-    max-width: 14ch;
+    font-size: clamp(2.5rem, 6vw, 4.4rem);
+    max-width: 16ch;
+    font-weight: 700;
 }
 
 .hero-summary {
@@ -335,8 +349,8 @@ select {
 /* Hero Demo Player - Goal 1 & 10 */
 .hero-demo-player {
     width: 100%;
-    max-width: 960px;
-    margin-top: 2rem;
+    max-width: 1000px;
+    margin: 3rem auto 0;
 }
 
 .player-outer {
@@ -344,7 +358,7 @@ select {
     border-radius: 20px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     overflow: hidden;
-    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.45);
 }
 
 .player-header {
@@ -736,8 +750,9 @@ select {
 
 .section-tinted {
     background: rgba(255, 255, 255, 0.28);
-    border-top: 1px solid rgba(95, 107, 118, 0.1);
-    border-bottom: 1px solid rgba(95, 107, 118, 0.1);
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    margin: 4rem 0;
 }
 
 .section-heading {
@@ -749,8 +764,18 @@ select {
 .section-heading h2,
 .copy-block h2,
 .access-block h2,
-.privacy-header h2 {
-    font-size: clamp(2rem, 4vw, 3rem);
+.privacy-header h2,
+.case-header h3 {
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.section-heading p,
+.section-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-soft);
+    opacity: 0.8;
 }
 
 .section-heading p,
@@ -797,11 +822,13 @@ select {
 /* Demo Section */
 .demo-video-main {
     background: #000;
-    border-radius: var(--radius-md);
+    border-radius: 20px;
     overflow: hidden;
     line-height: 0;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+    box-shadow: 0 35px 90px rgba(0,0,0,0.3);
     border: 1px solid rgba(255,255,255,0.1);
+    max-width: 1000px;
+    margin: 2rem auto;
 }
 
 .main-demo-video {
@@ -1031,14 +1058,17 @@ select {
 /* Features Section */
 .feature-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
 }
 
 .feature-card {
-    border-radius: var(--radius-md);
-    padding: 1.5rem;
-    transition: transform 180ms ease, box-shadow 180ms ease;
+    height: 100%;
+    border-radius: 20px;
+    padding: 32px;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+    display: flex;
+    flex-direction: column;
 }
 
 .feature-card:hover {
@@ -1153,18 +1183,18 @@ select {
 
 .report-card {
     text-align: left;
-    border-radius: 24px;
-    padding: 1rem;
+    border-radius: 20px;
+    padding: 24px;
     cursor: pointer;
-    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease;
     background: var(--bg-panel);
     border: 1px solid rgba(95, 107, 118, 0.16);
 }
 
 .report-card:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-soft);
-    border-color: rgba(154, 116, 64, 0.34);
+    transform: translateY(-6px);
+    box-shadow: 0 25px 60px rgba(34, 40, 49, 0.15);
+    border-color: rgba(154, 116, 64, 0.4);
 }
 
 .report-preview-sheet {
@@ -1392,7 +1422,7 @@ select {
 
 /* Footer */
 .footer {
-    padding: 2rem 0 2.8rem;
+    padding: 4rem 0;
     border-top: 1px solid rgba(95, 107, 118, 0.12);
 }
 
@@ -1495,7 +1525,6 @@ select {
 @media (max-width: 1100px) {
     .hero-grid,
     .two-column-layout,
-    .feature-grid,
     .doc-grid,
     .report-gallery,
     .contact-grid,
@@ -1503,6 +1532,10 @@ select {
     .arch-grid,
     .demo-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .feature-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 
     .workflow-lane {
