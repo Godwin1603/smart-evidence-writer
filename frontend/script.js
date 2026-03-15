@@ -46,10 +46,16 @@
     }
 
     function initClientId() {
-        clientId = localStorage.getItem('alfa_hawk_client_id');
-        if (!clientId) {
-            clientId = 'AH-' + Math.random().toString(36).substr(2, 9).toUpperCase() + '-' + Date.now();
-            localStorage.setItem('alfa_hawk_client_id', clientId);
+        try {
+            clientId = localStorage.getItem('alfa_hawk_client_id');
+            if (!clientId) {
+                clientId = 'AH-' + Math.random().toString(36).substr(2, 9).toUpperCase() + '-' + Date.now();
+                localStorage.setItem('alfa_hawk_client_id', clientId);
+            }
+        } catch (e) {
+            // Fallback for private browsing or null origin (file://)
+            clientId = 'AH-TEMP-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+            console.warn('LocalStorage inaccessible. Using session-only ID:', clientId);
         }
         console.info('Alfa Hawk Investigation ID:', clientId);
     }

@@ -79,20 +79,35 @@ ENABLE_DEBUG_ROUTES = _env_bool('ENABLE_DEBUG_ROUTES', DEBUG_MODE)
 PORT = _env_int('PORT', 5000)
 MAX_UPLOAD_SIZE_BYTES = _env_int('MAX_UPLOAD_SIZE', 50 * 1024 * 1024)
 CORS_ALLOWED_ORIGINS = _env_csv('CORS_ALLOWED_ORIGINS')
-DEFAULT_PROD_ORIGINS = ['https://app.alfagroups.tech']
+DEFAULT_PROD_ORIGINS = [
+    'https://app.alfagroups.tech',
+    'https://web-production-4c3f2.up.railway.app',
+    'https://smart-evidence-writer.vercel.app'
+]
 DEFAULT_DEV_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:5000',
     'http://127.0.0.1:5000',
+    'http://localhost:5500',  # Live Server default
 ]
-DEFAULT_ALLOWED_ORIGINS = DEFAULT_PROD_ORIGINS + (DEFAULT_DEV_ORIGINS if DEBUG_MODE else [])
+# In debug mode or if explicitly requested, allow * or more flexible origins
+DEFAULT_ALLOWED_ORIGINS = DEFAULT_PROD_ORIGINS + DEFAULT_DEV_ORIGINS
 
 app = Flask(__name__, static_folder=FRONTEND_DIR if HAS_FRONTEND_ASSETS else None)
 app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_SIZE_BYTES
+
+# Robust CORS configuration for platform readiness
 CORS(
     app,
-    resources={r'/api/*': {'origins': CORS_ALLOWED_ORIGINS or DEFAULT_ALLOWED_ORIGINS}},
+    resources={
+        r"/api/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "X-Client-ID", "Authorization"],
+            "expose_headers": ["Content-Disposition"]
+        }
+    },
 )
 
 # ─────────────────────────────────────────────────────────
