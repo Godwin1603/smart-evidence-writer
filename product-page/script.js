@@ -1,109 +1,105 @@
-// script.js — Alfa Hawk Product Page Interactions
-
 (function () {
     'use strict';
 
-    // ═══ NAVBAR SCROLL EFFECT ═══
-    const navbar = document.getElementById('navbar');
-    let lastScroll = 0;
-
-    window.addEventListener('scroll', () => {
-        const currentScroll = window.scrollY;
-        if (currentScroll > 50) {
-            navbar.classList.add('scrolled');
-        } else {
-            navbar.classList.remove('scrolled');
-        }
-        lastScroll = currentScroll;
-    });
-
-    // ═══ MOBILE NAV TOGGLE ═══
+    const topbar = document.getElementById('topbar');
     const navToggle = document.getElementById('navToggle');
-    const navLinks = document.getElementById('navLinks');
+    const topnav = document.getElementById('topnav');
+    const reportModal = document.getElementById('reportModal');
+    const reportFrame = document.getElementById('reportFrame');
+    const reportModalTitle = document.getElementById('reportModalTitle');
+    const reportModalFile = document.getElementById('reportModalFile');
+    const modalClose = document.getElementById('modalClose');
+    const reportCards = document.querySelectorAll('.report-card');
 
-    if (navToggle && navLinks) {
-        navToggle.addEventListener('click', () => {
-            navLinks.classList.toggle('open');
-            navToggle.classList.toggle('active');
-        });
+    function syncTopbarState() {
+        if (!topbar) return;
+        topbar.classList.toggle('is-scrolled', window.scrollY > 18);
+    }
 
-        // Close menu on link click
-        navLinks.querySelectorAll('a').forEach(link => {
-            link.addEventListener('click', () => {
-                navLinks.classList.remove('open');
-                navToggle.classList.remove('active');
-            });
+    function closeNav() {
+        if (!topnav || !navToggle) return;
+        topnav.classList.remove('is-open');
+        navToggle.setAttribute('aria-expanded', 'false');
+    }
+
+    function toggleNav() {
+        if (!topnav || !navToggle) return;
+        const isOpen = topnav.classList.toggle('is-open');
+        navToggle.setAttribute('aria-expanded', String(isOpen));
+    }
+
+    function openReportModal(src, title, fileLabel) {
+        if (!reportModal || !reportFrame) return;
+        reportModalTitle.textContent = title || 'Example Report';
+        reportModalFile.textContent = fileLabel || 'report.pdf';
+        reportFrame.src = `${src}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`;
+        reportModal.classList.add('is-open');
+        reportModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+    }
+
+    function closeReportModal() {
+        if (!reportModal || !reportFrame) return;
+        reportModal.classList.remove('is-open');
+        reportModal.setAttribute('aria-hidden', 'true');
+        reportFrame.src = '';
+        document.body.classList.remove('modal-open');
+    }
+
+    function smoothAnchorNavigation(event) {
+        const trigger = event.target.closest('a[href^="#"]');
+        if (!trigger) return;
+        const targetId = trigger.getAttribute('href');
+        if (!targetId || targetId === '#') return;
+        const target = document.querySelector(targetId);
+        if (!target) return;
+
+        event.preventDefault();
+        closeNav();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    window.addEventListener('scroll', syncTopbarState, { passive: true });
+    syncTopbarState();
+
+    if (navToggle) {
+        navToggle.addEventListener('click', toggleNav);
+    }
+
+    document.addEventListener('click', smoothAnchorNavigation);
+
+    if (topnav) {
+        topnav.querySelectorAll('a').forEach((link) => {
+            link.addEventListener('click', closeNav);
         });
     }
 
-    // ═══ SCROLL REVEAL ANIMATION ═══
-    const revealElements = () => {
-        const selectors = [
-            '.pain-card', '.feature-card', '.step-card',
-            '.sec-card', '.contact-card', '.ep-step',
-            '.problem-text', '.security-text', '.enterprise-block',
-            '.section-header', '.hero-stats'
-        ];
-
-        selectors.forEach(sel => {
-            document.querySelectorAll(sel).forEach(el => {
-                if (!el.classList.contains('reveal')) {
-                    el.classList.add('reveal');
-                }
-            });
+    reportCards.forEach((card) => {
+        card.addEventListener('click', () => {
+            openReportModal(
+                card.dataset.reportSrc,
+                card.dataset.reportTitle,
+                card.dataset.reportFile
+            );
         });
-    };
-
-    const observerCallback = (entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('visible');
-            }
-        });
-    };
-
-    const observer = new IntersectionObserver(observerCallback, {
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px'
     });
 
-    // Initialize on DOM load
-    document.addEventListener('DOMContentLoaded', () => {
-        revealElements();
-        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-    });
-
-    // Fallback if DOMContentLoaded already fired
-    if (document.readyState !== 'loading') {
-        revealElements();
-        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    if (modalClose) {
+        modalClose.addEventListener('click', closeReportModal);
     }
 
-    // ═══ SMOOTH SCROLL FOR ANCHOR LINKS ═══
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
-            const targetId = this.getAttribute('href');
-            if (targetId === '#') return;
-
-            const target = document.querySelector(targetId);
-            if (target) {
-                e.preventDefault();
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (reportModal) {
+        reportModal.addEventListener('click', (event) => {
+            if (event.target instanceof HTMLElement && event.target.dataset.closeModal === 'true') {
+                closeReportModal();
             }
         });
+    }
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            closeReportModal();
+            closeNav();
+        }
     });
-
-    // ═══ STAGGERED CARD ANIMATION ═══
-    const staggerCards = (selector) => {
-        const cards = document.querySelectorAll(selector);
-        cards.forEach((card, index) => {
-            card.style.transitionDelay = `${index * 0.08}s`;
-        });
-    };
-
-    staggerCards('.feature-card');
-    staggerCards('.pain-card');
-    staggerCards('.contact-card');
-    staggerCards('.sec-card');
-
 })();

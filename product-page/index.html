@@ -4,368 +4,678 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alfa Hawk — AI-Powered Forensic Evidence Analysis | Alfa Labs</title>
+    <title>Alfa Hawk | Professional Forensic Evidence Workstation</title>
     <meta name="description"
-        content="Alfa Hawk transforms raw evidence into court-ready forensic reports in seconds. AI-powered video, image & audio analysis. Enterprise-grade. By Alfa Labs.">
-    <meta name="keywords"
-        content="forensic evidence analysis, AI evidence, police report generator, evidence management, law enforcement AI, Alfa Hawk, Alfa Labs">
+        content="Alfa Hawk is an AI-assisted forensic evidence workstation for analyzing digital evidence, reconstructing event timelines, and generating structured investigation reports.">
+    <link rel="icon" type="image/png" href="../frontend/assets/logo.png">
+    <link rel="apple-touch-icon" href="../frontend/assets/logo.png">
     <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap"
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
         rel="stylesheet">
 </head>
 
 <body>
-
-    <!-- ═══ NAVIGATION ═══ -->
-    <nav id="navbar">
-        <div class="nav-inner">
-            <a href="#" class="nav-brand">
-                <span class="nav-logo">α</span>
-                <span class="nav-brand-text">Alfa Hawk</span>
-            </a>
-            <div class="nav-links" id="navLinks">
-                <a href="#features">Features</a>
-                <a href="#how-it-works">How It Works</a>
-                <a href="#security">Security</a>
-                <a href="#enterprise">Enterprise</a>
-                <a href="#contact">Contact</a>
-            </div>
-            <a href="#contact" class="nav-cta">Request Access</a>
-            <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
-                <span></span><span></span><span></span>
-            </button>
-        </div>
-    </nav>
-
-    <!-- ═══ HERO ═══ -->
-    <section id="hero">
-        <div class="hero-bg-pattern"></div>
-        <div class="hero-content">
-            <div class="hero-badge">
-                <span class="badge-dot"></span>
-                A Product of Alfa Groups
-            </div>
-            <h1>
-                <span class="hero-line-1">Stop Spending Hours</span>
-                <span class="hero-line-2">Writing Evidence Reports.</span>
-            </h1>
-            <p class="hero-tagline">
-                Alfa Hawk turns raw evidence — video, images, audio — into structured,
-                court-ready forensic reports in <strong>under 60 seconds</strong>.
-                Powered by AI. Built for law enforcement.
-            </p>
-            <div class="hero-actions">
-                <a href="#contact" class="btn btn-gold btn-large">Request Enterprise Access</a>
-                <a href="#how-it-works" class="btn btn-outline btn-large">See How It Works</a>
-            </div>
-            <div class="hero-stats">
-                <div class="stat">
-                    <span class="stat-value">60s</span>
-                    <span class="stat-label">Average Report Time</span>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="stat">
-                    <span class="stat-value">100%</span>
-                    <span class="stat-label">In-Memory Processing</span>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="stat">
-                    <span class="stat-value">0</span>
-                    <span class="stat-label">Data Stored on Cloud</span>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ PROBLEM STATEMENT ═══ -->
-    <section id="problem" class="section-dark">
-        <div class="container">
-            <div class="problem-grid">
-                <div class="problem-text">
-                    <span class="section-badge">The Problem</span>
-                    <h2>Evidence Analysis Shouldn&rsquo;t Take Days.</h2>
-                    <p>
-                        Law enforcement officers spend <strong>4&ndash;8 hours</strong> manually reviewing CCTV footage,
-                        documenting violations, identifying suspects, and drafting forensic reports.
-                        Critical evidence details get missed. Reports lack structure.
-                        Cases get delayed.
-                    </p>
-                    <p>
-                        <strong>Alfa Hawk eliminates that bottleneck.</strong> Upload your evidence, and our AI
-                        delivers a structured, legally formatted report &mdash; complete with
-                        extracted frames, identified persons, vehicle plates, violations,
-                        risk assessments, and investigative recommendations.
-                    </p>
-                </div>
-                <div class="problem-cards">
-                    <div class="pain-card">
-                        <span class="pain-icon">&#128337;</span>
-                        <h3>Hours of Manual Work</h3>
-                        <p>Officers spend entire shifts reviewing footage frame by frame</p>
-                    </div>
-                    <div class="pain-card">
-                        <span class="pain-icon">&#128196;</span>
-                        <h3>Inconsistent Reports</h3>
-                        <p>Report quality varies by officer — no standardized format</p>
-                    </div>
-                    <div class="pain-card">
-                        <span class="pain-icon">&#9888;</span>
-                        <h3>Missed Evidence</h3>
-                        <p>Critical details get overlooked in manual review processes</p>
-                    </div>
-                    <div class="pain-card">
-                        <span class="pain-icon">&#128274;</span>
-                        <h3>Data Security Risks</h3>
-                        <p>Evidence files copied across systems without proper controls</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ FEATURES ═══ -->
-    <section id="features">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-badge">Capabilities</span>
-                <h2>Everything You Need. Nothing You Don&rsquo;t.</h2>
-                <p>Alfa Hawk analyzes every frame, every face, every plate — and generates a complete forensic report.
-                </p>
-            </div>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">&#128249;</div>
-                    <h3>Multi-Format Evidence</h3>
-                    <p>Upload images (JPG, PNG), videos (MP4, AVI), or audio (MP3, WAV). One platform for all evidence
-                        types.</p>
-                </div>
-                <div class="feature-card featured">
-                    <div class="feature-icon">&#129302;</div>
-                    <h3>AI Vision Analysis</h3>
-                    <p>Powered by advanced vision AI that identifies violations, accidents, persons, vehicles, and
-                        landmarks automatically.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">&#127909;</div>
-                    <h3>Smart Frame Extraction</h3>
-                    <p>OpenCV-powered scene detection extracts key moments from video — no frame is missed.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">&#128203;</div>
-                    <h3>Structured Reports</h3>
-                    <p>Police/legal format: executive summary, violations, persons, vehicles, timeline, risk assessment,
-                        recommendations.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">&#128462;</div>
-                    <h3>Professional PDF Output</h3>
-                    <p>Court-ready PDF reports with embedded evidence frames, severity classifications, and signature
-                        blocks.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">&#128663;</div>
-                    <h3>Vehicle &amp; Plate Detection</h3>
-                    <p>Identifies vehicle types, colors, and number plates with region identification and confidence
-                        scoring.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">&#128100;</div>
-                    <h3>Person Identification</h3>
-                    <p>Detects and documents all visible persons with clothing descriptions, estimated age, activity,
-                        and relevance.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">&#9201;</div>
-                    <h3>Chronological Timeline</h3>
-                    <p>Auto-generates an event timeline from video evidence, ordering every detected incident
-                        sequentially.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ HOW IT WORKS ═══ -->
-    <section id="how-it-works" class="section-dark">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-badge">Process</span>
-                <h2>From Evidence to Report in 3 Steps</h2>
-                <p>No installations. No cloud storage. No complexity.</p>
-            </div>
-            <div class="steps-grid">
-                <div class="step-card">
-                    <div class="step-number">01</div>
-                    <div class="step-content">
-                        <h3>Upload Evidence</h3>
-                        <p>Drag and drop your image, video, or audio file. Up to 100MB per file. Everything stays in
-                            memory — nothing touches disk.</p>
-                    </div>
-                </div>
-                <div class="step-connector"></div>
-                <div class="step-card">
-                    <div class="step-number">02</div>
-                    <div class="step-content">
-                        <h3>AI Analyzes</h3>
-                        <p>Our AI vision model scans every frame — detecting violations, faces, vehicles, plates,
-                            landmarks, and hazards. All in under a minute.</p>
-                    </div>
-                </div>
-                <div class="step-connector"></div>
-                <div class="step-card">
-                    <div class="step-number">03</div>
-                    <div class="step-content">
-                        <h3>Download Report</h3>
-                        <p>Get a structured forensic report on screen and as a professional PDF — ready for court, with
-                            embedded evidence frames and signature blocks.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ SECURITY ═══ -->
-    <section id="security">
-        <div class="container">
-            <div class="security-layout">
-                <div class="security-text">
-                    <span class="section-badge">Zero-Storage Architecture</span>
-                    <h2>Your Evidence Never Leaves Your Control.</h2>
-                    <p>
-                        Alfa Hawk was built with a <strong>zero-persistence architecture</strong>.
-                        No files are written to disk. No data is stored in the cloud.
-                        Sessions auto-expire after 30 minutes, and all evidence is purged from memory.
-                    </p>
-                </div>
-                <div class="security-cards">
-                    <div class="sec-card">
-                        <span class="sec-icon">&#128736;</span>
-                        <h4>In-Memory Only</h4>
-                        <p>All processing happens in RAM. Zero disk writes.</p>
-                    </div>
-                    <div class="sec-card">
-                        <span class="sec-icon">&#9201;</span>
-                        <h4>Auto-Expiry</h4>
-                        <p>Sessions self-destruct after 30 minutes.</p>
-                    </div>
-                    <div class="sec-card">
-                        <span class="sec-icon">&#128274;</span>
-                        <h4>No Cloud Storage</h4>
-                        <p>No Firebase, no S3, no external storage. Period.</p>
-                    </div>
-                    <div class="sec-card">
-                        <span class="sec-icon">&#128737;</span>
-                        <h4>Enterprise-Grade</h4>
-                        <p>Deploy on-premise behind your own firewall.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ ENTERPRISE CTA ═══ -->
-    <section id="enterprise" class="section-dark">
-        <div class="container">
-            <div class="enterprise-block">
-                <span class="section-badge badge-gold">Enterprise Only</span>
-                <h2>Built for Authorized Agencies &amp; Enterprises</h2>
-                <p>
-                    Alfa Hawk is available exclusively to verified law enforcement agencies,
-                    government bodies, and authorized enterprises. Pricing is determined after
-                    a verification process to ensure responsible, authorized use.
-                </p>
-                <div class="enterprise-process">
-                    <div class="ep-step">
-                        <span class="ep-num">1</span>
-                        <span class="ep-text">Submit inquiry via email or phone</span>
-                    </div>
-                    <div class="ep-arrow">&rarr;</div>
-                    <div class="ep-step">
-                        <span class="ep-num">2</span>
-                        <span class="ep-text">Organization verification by Alfa Labs</span>
-                    </div>
-                    <div class="ep-arrow">&rarr;</div>
-                    <div class="ep-step">
-                        <span class="ep-num">3</span>
-                        <span class="ep-text">Custom pricing &amp; deployment</span>
-                    </div>
-                </div>
-                <a href="#contact" class="btn btn-gold btn-large">Contact Us to Get Started</a>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ CONTACT ═══ -->
-    <section id="contact">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-badge">Get In Touch</span>
-                <h2>Ready to Transform Your Evidence Workflow?</h2>
-                <p>Reach out to our team for enterprise access, demos, or partnership inquiries.</p>
-            </div>
-            <div class="contact-grid">
-                <div class="contact-card">
-                    <span class="contact-icon">&#128231;</span>
-                    <h3>Email</h3>
-                    <a href="mailto:contact@alfagroups.tech">contact@alfagroups.tech</a>
-                    <p>For enterprise inquiries, demos &amp; partnerships</p>
-                </div>
-                <div class="contact-card">
-                    <span class="contact-icon">&#128222;</span>
-                    <h3>Phone</h3>
-                    <a href="tel:+916379656950">+91 6379 656 950</a>
-                    <p>Available Mon&ndash;Sat, 10 AM &ndash; 6 PM IST</p>
-                </div>
-                <div class="contact-card">
-                    <span class="contact-icon">&#128205;</span>
-                    <h3>Location</h3>
-                    <p class="contact-location">Coimbatore, Tamil Nadu, India</p>
-                    <p>Alfa Labs HQ</p>
-                </div>
-                <div class="contact-card">
-                    <span class="contact-icon">&#128101;</span>
-                    <h3>LinkedIn</h3>
-                    <a href="https://www.linkedin.com/in/godwin1603" target="_blank" rel="noopener">Connect on
-                        LinkedIn</a>
-                    <p>Follow for updates &amp; announcements</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══ FOOTER ═══ -->
-    <footer>
-        <div class="container">
-            <div class="footer-grid">
-                <div class="footer-brand">
-                    <div class="footer-logo">
-                        <span class="nav-logo">α</span>
-                        <span>Alfa Hawk</span>
-                    </div>
-                    <p>AI-Powered Forensic Evidence Analysis Platform</p>
-                    <p class="footer-org">Developed by <strong>Alfa Labs</strong> &bull; A Product of <strong>Alfa
-                            Groups</strong></p>
-                </div>
-                <div class="footer-links">
-                    <h4>Product</h4>
+    <div class="page-shell">
+        <header class="topbar" id="topbar">
+            <div class="container topbar-inner">
+                <a href="#hero" class="brand-mark" aria-label="Alfa Hawk home">
+                    <img class="brand-emblem-image" src="../frontend/assets/logo.png" alt="Alfa Hawk logo">
+                    <span class="brand-copy">
+                        <strong>Alfa Hawk</strong>
+                        <span>Developed by Alfa Labs, a child company of Alfa Groups</span>
+                    </span>
+                </a>
+                <nav class="topnav" id="topnav">
+                    <a href="#workflow">Workflow</a>
                     <a href="#features">Features</a>
-                    <a href="#how-it-works">How It Works</a>
-                    <a href="#security">Security</a>
-                    <a href="#enterprise">Enterprise</a>
+                    <a href="#reports">Reports</a>
+                    <a href="#use-cases">Use Cases</a>
+                    <a href="#platform-notes">Platform</a>
+                    <a href="#contact">Contact</a>
+                </nav>
+                <div class="topbar-actions">
+                    <a class="button button-ghost" href="../docs/system-overview.md">Documentation</a>
+                    <a class="button button-primary" href="https://app.alfagroups.tech" target="_blank"
+                        rel="noopener">Launch Workstation</a>
+                    <button class="nav-toggle" id="navToggle" type="button" aria-label="Toggle navigation">
+                        <span></span><span></span><span></span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- HERO SECTION - COMPLETELY REWORKED -->
+            <section class="hero" id="hero">
+                <div class="container hero-grid">
+                    <div class="hero-copy">
+                        <div class="section-chip">Investigation Platform</div>
+                        <h1>Turn raw evidence into structured forensic reports in minutes</h1>
+                        <p class="hero-summary">
+                            Upload video, images, or audio. Alfa Hawk's AI reconstructs events, extracts key frames, and generates an investigator-ready report with timeline, entities, and threat assessment.
+                        </p>
+                        <p class="hero-note">
+                            Alfa Hawk is being developed by Alfa Labs. The current release is the initial public workstation build, with broader enterprise workflows in progress.
+                        </p>
+                        <div class="hero-actions">
+                            <a class="button button-primary" href="https://app.alfagroups.tech" target="_blank"
+                                rel="noopener">Launch Investigation Workstation</a>
+                            <a class="button button-secondary" href="#demo">Watch Demo</a>
+                        </div>
+                        
+                        <!-- VISUAL PIPELINE - Shows workflow at a glance -->
+                        <div class="hero-pipeline">
+                            <div class="pipeline-step">
+                                <span class="step-icon">📤</span>
+                                <span class="step-label">Upload</span>
+                            </div>
+                            <div class="pipeline-arrow">→</div>
+                            <div class="pipeline-step">
+                                <span class="step-icon">🧠</span>
+                                <span class="step-label">AI Analysis</span>
+                            </div>
+                            <div class="pipeline-arrow">→</div>
+                            <div class="pipeline-step">
+                                <span class="step-icon">⏳</span>
+                                <span class="step-label">Timeline</span>
+                            </div>
+                            <div class="pipeline-arrow">→</div>
+                            <div class="pipeline-step">
+                                <span class="step-icon">🖼️</span>
+                                <span class="step-label">Frames</span>
+                            </div>
+                            <div class="pipeline-arrow">→</div>
+                            <div class="pipeline-step">
+                                <span class="step-icon">📄</span>
+                                <span class="step-label">Report</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- RIGHT PANEL - Kept but enhanced -->
+                    <div class="hero-panel">
+                        <div class="panel-header">
+                            <span>Investigation Workflow</span>
+                            <span class="mono">ALFA-LABS / GRAPHITE</span>
+                        </div>
+                        <div class="panel-grid">
+                            <article class="panel-metric">
+                                <span class="metric-kicker">Output</span>
+                                <strong>Structured Forensic Report</strong>
+                                <p>Executive summary, reconstruction, evidence frames, timeline, persons, and threat assessment.</p>
+                            </article>
+                            <article class="panel-metric">
+                                <span class="metric-kicker">Privacy</span>
+                                <strong>Volatile Session Handling</strong>
+                                <p>Evidence and keys are processed in memory and cleared after session completes.</p>
+                            </article>
+                            <article class="panel-metric wide">
+                                <span class="metric-kicker">Platform Stage</span>
+                                <strong>Early Access Platform</strong>
+                                <p>Alfa Hawk is actively evolving with new investigation capabilities being added regularly.</p>
+                            </article>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- SOCIAL PROOF - New section for credibility -->
+                <div class="container social-proof">
+                    <p class="social-proof-text">Trusted by professionals in</p>
+                    <div class="social-proof-logos">
+                        <span class="logo-placeholder">Law Enforcement</span>
+                        <span class="logo-placeholder">Corporate Security</span>
+                        <span class="logo-placeholder">Digital Forensics</span>
+                        <span class="logo-placeholder">Insurance Investigation</span>
+                        <span class="logo-placeholder">Academic Research</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PROBLEM/SOLUTION SECTION - New section to frame the problem -->
+            <section class="section section-tinted" id="problem">
+                <div class="container two-column-layout">
+                    <div class="copy-block problem-block">
+                        <div class="section-chip">The Challenge</div>
+                        <h2>Digital evidence investigation is broken</h2>
+                        <p class="statement">
+                            Investigators spend hours watching footage, manually extracting frames, building timelines, and compiling reports. This slow process delays justice and creates backlogs.
+                        </p>
+                        <ul class="bullet-list">
+                            <li>Hours of video to review manually</li>
+                            <li>Critical events easily missed</li>
+                            <li>Timeline reconstruction is tedious</li>
+                            <li>Report compilation takes days</li>
+                        </ul>
+                    </div>
+                    <div class="copy-block solution-block">
+                        <div class="section-chip">The Solution</div>
+                        <h2>AI-powered automation</h2>
+                        <p class="statement">
+                            Alfa Hawk automates the entire workflow. Upload evidence, let AI analyze it, and get a structured forensic report in minutes instead of days.
+                        </p>
+                        <ul class="bullet-list">
+                            <li>Process hours of footage in minutes</li>
+                            <li>AI detects people, objects, events</li>
+                            <li>Automatic timeline reconstruction</li>
+                            <li>Instant report generation</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- LIVE DEMO PREVIEW - New section showing real product -->
+            <section class="section" id="demo">
+                <div class="container">
+                    <div class="section-heading">
+                        <div class="section-chip">See It In Action</div>
+                        <h2>Real investigation. Real results.</h2>
+                        <p>Watch how Alfa Hawk transforms raw CCTV footage into a complete forensic report.</p>
+                    </div>
+                    
+                    <div class="demo-showcase">
+                        <div class="demo-video-placeholder">
+                            <div class="demo-grid">
+                                <div class="demo-column">
+                                    <div class="demo-label">Raw Evidence</div>
+                                    <div class="demo-frame">
+                                        <div class="frame-content">
+                                            <span class="frame-time">00:00</span>
+                                            <div class="frame-visual empty-lot"></div>
+                                        </div>
+                                        <div class="frame-content">
+                                            <span class="frame-time">00:05</span>
+                                            <div class="frame-visual person-enters"></div>
+                                        </div>
+                                        <div class="frame-content">
+                                            <span class="frame-time">00:12</span>
+                                            <div class="frame-visual object-drop"></div>
+                                        </div>
+                                        <div class="frame-content">
+                                            <span class="frame-time">00:20</span>
+                                            <div class="frame-visual vehicle-arrives"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="demo-column">
+                                    <div class="demo-label">AI Analysis</div>
+                                    <div class="demo-analysis">
+                                        <div class="detection-card">
+                                            <span class="detection-time">00:05</span>
+                                            <span class="detection-event">Person enters frame</span>
+                                            <span class="detection-confidence">98%</span>
+                                        </div>
+                                        <div class="detection-card">
+                                            <span class="detection-time">00:12</span>
+                                            <span class="detection-event">Object dropped (backpack)</span>
+                                            <span class="detection-confidence">95%</span>
+                                        </div>
+                                        <div class="detection-card">
+                                            <span class="detection-time">00:20</span>
+                                            <span class="detection-event">White sedan arrives</span>
+                                            <span class="detection-confidence">97%</span>
+                                        </div>
+                                        <div class="detection-card">
+                                            <span class="detection-time">00:28</span>
+                                            <span class="detection-event">Person enters vehicle</span>
+                                            <span class="detection-confidence">96%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="demo-column">
+                                    <div class="demo-label">Generated Timeline</div>
+                                    <div class="demo-timeline">
+                                        <div class="timeline-event">
+                                            <span class="event-marker"></span>
+                                            <span class="event-desc">00:05 - Person enters</span>
+                                        </div>
+                                        <div class="timeline-event">
+                                            <span class="event-marker"></span>
+                                            <span class="event-desc">00:12 - Backpack dropped</span>
+                                        </div>
+                                        <div class="timeline-event">
+                                            <span class="event-marker"></span>
+                                            <span class="event-desc">00:20 - Vehicle arrives</span>
+                                        </div>
+                                        <div class="timeline-event">
+                                            <span class="event-marker"></span>
+                                            <span class="event-desc">00:28 - Person departs</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="demo-actions">
+                            <a class="button button-primary" href="https://app.alfagroups.tech" target="_blank">Try It Yourself</a>
+                            <a class="button button-secondary" href="../examples/example-report.pdf">View Sample Report</a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- WORKFLOW SECTION - Enhanced with better copy -->
+            <section class="section section-tinted" id="workflow">
+                <div class="container">
+                    <div class="section-heading">
+                        <div class="section-chip">How It Works</div>
+                        <h2>From evidence to report in 5 steps</h2>
+                        <p>No manual timeline building. No complex software. Just upload and get results.</p>
+                    </div>
+                    <div class="workflow-lane">
+                        <article class="workflow-step">
+                            <span class="workflow-index">01</span>
+                            <h3>Upload Evidence</h3>
+                            <p>Drop video, images, or audio files into the workstation. Supports MP4, JPG, PNG, MP3, and more.</p>
+                        </article>
+                        <article class="workflow-step">
+                            <span class="workflow-index">02</span>
+                            <h3>AI Analysis</h3>
+                            <p>System detects people, vehicles, objects, and actions using multimodal AI. No manual tagging required.</p>
+                        </article>
+                        <article class="workflow-step">
+                            <span class="workflow-index">03</span>
+                            <h3>Timeline Reconstruction</h3>
+                            <p>Events are automatically arranged into a chronological investigation timeline with timestamps.</p>
+                        </article>
+                        <article class="workflow-step">
+                            <span class="workflow-index">04</span>
+                            <h3>Evidence Frame Extraction</h3>
+                            <p>Critical frames are captured and linked to timeline events for verification and reporting.</p>
+                        </article>
+                        <article class="workflow-step">
+                            <span class="workflow-index">05</span>
+                            <h3>Generate Report</h3>
+                            <p>Export a structured forensic report (PDF/JSON) with executive summary, timeline, and evidence frames.</p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <!-- FEATURES SECTION - Completely rewritten for clarity -->
+            <section class="section" id="features">
+                <div class="container">
+                    <div class="section-heading">
+                        <div class="section-chip">Key Features</div>
+                        <h2>Built for investigators, not engineers</h2>
+                        <p>Every feature is designed to save time and improve investigation quality.</p>
+                    </div>
+                    <div class="feature-grid">
+                        <article class="feature-card highlight">
+                            <span class="feature-icon">⏱️</span>
+                            <h3>Timeline Reconstruction</h3>
+                            <p>AI converts raw footage into chronological event timelines automatically. No manual timestamping.</p>
+                        </article>
+                        <article class="feature-card">
+                            <span class="feature-icon">🖼️</span>
+                            <h3>Evidence Frame Linking</h3>
+                            <p>Each timeline event is tied to extracted video frames for verification and chain of custody.</p>
+                        </article>
+                        <article class="feature-card">
+                            <span class="feature-icon">📊</span>
+                            <h3>Investigation Reports</h3>
+                            <p>Generate structured forensic reports with executive summary, timeline, persons, and threat assessment.</p>
+                        </article>
+                        <article class="feature-card">
+                            <span class="feature-icon">🔒</span>
+                            <h3>Privacy-First Processing</h3>
+                            <p>Evidence analyzed in memory and never stored. API keys not retained. Automatic artifact deletion.</p>
+                        </article>
+                        <article class="feature-card">
+                            <span class="feature-icon">🎯</span>
+                            <h3>Person & Object Detection</h3>
+                            <p>Detect people, vehicles, weapons, bags, and other objects appearing in evidence.</p>
+                        </article>
+                        <article class="feature-card">
+                            <span class="feature-icon">🎬</span>
+                            <h3>Multimodal Analysis</h3>
+                            <p>Supports video, images, and audio investigation in a single workflow.</p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <!-- USE CASES SECTION - New section for market targeting -->
+            <section class="section section-tinted" id="use-cases">
+                <div class="container">
+                    <div class="section-heading">
+                        <div class="section-chip">Use Cases</div>
+                        <h2>Who benefits from Alfa Hawk</h2>
+                        <p>From law enforcement to corporate security, our platform accelerates investigations.</p>
+                    </div>
+                    <div class="usecase-grid">
+                        <article class="usecase-card">
+                            <div class="usecase-icon">👮</div>
+                            <h3>Law Enforcement</h3>
+                            <p>Analyze CCTV evidence from crime scenes, reconstruct incident timelines, and generate case files faster.</p>
+                        </article>
+                        <article class="usecase-card">
+                            <div class="usecase-icon">🏢</div>
+                            <h3>Corporate Security</h3>
+                            <p>Investigate internal surveillance footage for theft, safety incidents, or policy violations.</p>
+                        </article>
+                        <article class="usecase-card">
+                            <div class="usecase-icon">💻</div>
+                            <h3>Digital Forensics</h3>
+                            <p>Process evidence from multiple sources and generate structured investigation reports for court.</p>
+                        </article>
+                        <article class="usecase-card">
+                            <div class="usecase-icon">📋</div>
+                            <h3>Insurance Investigation</h3>
+                            <p>Analyze accident or fraud footage to validate claims and speed up settlements.</p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <!-- REPORTS SECTION - Now shows REAL report preview -->
+            <section class="section" id="reports">
+                <div class="container">
+                    <div class="section-heading">
+                        <div class="section-chip">Report Preview</div>
+                        <h2>See what investigators receive</h2>
+                        <p>Every report includes executive summary, timeline, detected entities, and evidence frames.</p>
+                    </div>
+                    
+                    <!-- REAL REPORT PREVIEW - Not just skeletons -->
+                    <div class="real-report-preview">
+                        <div class="report-tabs">
+                            <button class="tab-button active">Executive Summary</button>
+                            <button class="tab-button">Timeline</button>
+                            <button class="tab-button">Detected Entities</button>
+                            <button class="tab-button">Evidence Frames</button>
+                            <button class="tab-button">Threat Assessment</button>
+                        </div>
+                        <div class="report-content-preview">
+                            <div class="preview-section">
+                                <h4>Incident Overview</h4>
+                                <p>Analysis of surveillance footage from parking lot shows individual entering frame at 00:05, dropping backpack at 00:12, and departing in white sedan at 00:28.</p>
+                                
+                                <h4>Key Findings</h4>
+                                <ul>
+                                    <li><strong>Person of Interest:</strong> Male, dark clothing, backpack</li>
+                                    <li><strong>Object:</strong> Black backpack (abandoned)</li>
+                                    <li><strong>Vehicle:</strong> White sedan, license plate partially visible</li>
+                                    <li><strong>Timeline:</strong> 23 seconds from entry to departure</li>
+                                </ul>
+                                
+                                <div class="preview-frames">
+                                    <div class="frame-thumb"></div>
+                                    <div class="frame-thumb"></div>
+                                    <div class="frame-thumb"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Original report cards kept but enhanced -->
+                    <div class="report-gallery">
+                        <button class="report-card" type="button" data-report-src="../examples/AlfaHawk_Forensic_Report_227594d2.pdf"
+                            data-report-title="Alfa Hawk Forensic Report" data-report-file="AlfaHawk_Forensic_Report_227594d2.pdf">
+                            <div class="report-preview-sheet">
+                                <div class="preview-bar"></div>
+                                <div class="preview-block preview-title"></div>
+                                <div class="preview-block preview-line wide"></div>
+                                <div class="preview-grid">
+                                    <span>Executive Summary</span>
+                                    <span>Incident Reconstruction</span>
+                                    <span>Evidence Frames</span>
+                                    <span>Timeline</span>
+                                    <span>Persons of Interest</span>
+                                    <span>Threat Assessment</span>
+                                </div>
+                            </div>
+                            <div class="report-card-meta">
+                                <strong>Primary Investigation Report</strong>
+                                <span class="mono">Generated PDF Reference</span>
+                            </div>
+                        </button>
+
+                        <button class="report-card" type="button" data-report-src="../examples/Forensic_Report_5af81eae.pdf"
+                            data-report-title="Forensic Report Reference" data-report-file="Forensic_Report_5af81eae.pdf">
+                            <div class="report-preview-sheet alternate">
+                                <div class="preview-bar"></div>
+                                <div class="preview-block preview-title"></div>
+                                <div class="preview-columns">
+                                    <div class="preview-column">
+                                        <span>Chronological Timeline</span>
+                                        <span>Objects Detected</span>
+                                        <span>Risk Review</span>
+                                    </div>
+                                    <div class="preview-column">
+                                        <span>Evidence Hashing</span>
+                                        <span>Report Certification</span>
+                                        <span>Linked Frames</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="report-card-meta">
+                                <strong>Extended Evidence Report</strong>
+                                <span class="mono">Detailed PDF Reference</span>
+                            </div>
+                        </button>
+
+                        <button class="report-card" type="button" data-report-src="../examples/Evidence_Report_ (5).pdf"
+                            data-report-title="Compact Evidence Report" data-report-file="Evidence_Report_ (5).pdf">
+                            <div class="report-preview-sheet compact">
+                                <div class="preview-bar"></div>
+                                <div class="preview-block preview-title short"></div>
+                                <div class="preview-block preview-line"></div>
+                                <div class="preview-block preview-line"></div>
+                                <div class="preview-stamp">CERTIFIED OUTPUT</div>
+                            </div>
+                            <div class="report-card-meta">
+                                <strong>Compact Output Example</strong>
+                                <span class="mono">Field Review Reference</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- BYO KEY SECTION - Enhanced messaging -->
+            <section class="section section-tinted" id="byo-key">
+                <div class="container two-column-layout">
+                    <div class="copy-block">
+                        <div class="section-chip">Use Your Own AI Account</div>
+                        <h2>No platform limits. Full control.</h2>
+                        <p class="statement">
+                            Run investigations using your own AI quota. No shared platform caps, no usage limits, complete cost control.
+                        </p>
+                        <ul class="bullet-list">
+                            <li>Unlimited analysis with your own API key</li>
+                            <li>Full control over usage and costs</li>
+                            <li>No dependency on shared platform quotas</li>
+                            <li>Private processing with your credentials</li>
+                        </ul>
+                    </div>
+                    <div class="instruction-panel">
+                        <h3>Simple 3-step setup</h3>
+                        <ol class="number-list">
+                            <li>Create a Gemini API key from Google AI Studio</li>
+                            <li>Copy the API key</li>
+                            <li>Paste it into Alfa Hawk settings panel</li>
+                        </ol>
+                        <a class="inline-link" href="../docs/quickstart.md">Read setup guidance →</a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PRIVACY SECTION - Enhanced with trust badges -->
+            <section class="section" id="privacy">
+                <div class="container">
+                    <div class="privacy-showcase">
+                        <div class="privacy-header">
+                            <div class="section-chip">Privacy By Design</div>
+                            <h2>Your evidence stays with you</h2>
+                            <p class="statement">Alfa Hawk processes everything in memory and never stores your data.</p>
+                        </div>
+                        <div class="privacy-badges">
+                            <div class="privacy-badge">
+                                <span class="badge-icon">✓</span>
+                                <strong>Evidence never stored</strong>
+                            </div>
+                            <div class="privacy-badge">
+                                <span class="badge-icon">✓</span>
+                                <strong>API keys not retained</strong>
+                            </div>
+                            <div class="privacy-badge">
+                                <span class="badge-icon">✓</span>
+                                <strong>In-memory analysis only</strong>
+                            </div>
+                            <div class="privacy-badge">
+                                <span class="badge-icon">✓</span>
+                                <strong>Automatic artifact deletion</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TECHNICAL ARCHITECTURE - New section for developers -->
+            <section class="section section-tinted" id="architecture">
+                <div class="container">
+                    <div class="section-heading">
+                        <div class="section-chip">Technical Architecture</div>
+                        <h2>Built for security and scale</h2>
+                        <p>Modern stack with privacy-first processing.</p>
+                    </div>
+                    <div class="arch-grid">
+                        <div class="arch-card">
+                            <h3>Frontend</h3>
+                            <p>Vercel-hosted UI with responsive design</p>
+                            <span class="arch-tag">React</span>
+                        </div>
+                        <div class="arch-card">
+                            <h3>API Layer</h3>
+                            <p>Railway-deployed backend services</p>
+                            <span class="arch-tag">Node.js</span>
+                        </div>
+                        <div class="arch-card">
+                            <h3>Processing</h3>
+                            <p>In-memory AI analysis via Gemini API</p>
+                            <span class="arch-tag">Multimodal</span>
+                        </div>
+                        <div class="arch-card">
+                            <h3>Output</h3>
+                            <p>Structured forensic reports (PDF/JSON)</p>
+                            <span class="arch-tag">Forensic Format</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PLATFORM NOTES - Rephrased positively -->
+            <section class="section" id="platform-notes">
+                <div class="container">
+                    <div class="section-heading">
+                        <div class="section-chip">Platform Status</div>
+                        <h2>Early Access, Active Development</h2>
+                        <p>Alfa Hawk is publicly available and actively evolving with new capabilities.</p>
+                    </div>
+                    <div class="doc-grid platform-grid">
+                        <article class="doc-card">
+                            <strong>Open-source core</strong>
+                            <span>Evidence processing, frame extraction, and report generation available in open codebase.</span>
+                            <a class="inline-link" href="https://github.com/Godwin1603/smart-evidence-writer" target="_blank" rel="noopener">View GitHub →</a>
+                        </article>
+                        <article class="doc-card">
+                            <strong>Documentation</strong>
+                            <span>Architecture, deployment, API reference, and quickstart guidance available.</span>
+                            <a class="inline-link" href="../docs/architecture.md">Open docs →</a>
+                        </article>
+                        <article class="doc-card">
+                            <strong>Current release</strong>
+                            <span><span class="mono">v1.0.0</span> stable. <span class="mono">v1.1.0</span> adding enhanced detection.</span>
+                        </article>
+                        <article class="doc-card">
+                            <strong>Enterprise ready</strong>
+                            <span>Custom deployments available. Contact Alfa Labs for early coordination.</span>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ACCESS CTA - Enhanced -->
+            <section class="section section-access" id="access">
+                <div class="container access-block">
+                    <div>
+                        <div class="section-chip">Get Started Now</div>
+                        <h2>Start investigating in minutes</h2>
+                        <p>No setup. No credit card. Just upload evidence and get results.</p>
+                    </div>
+                    <div class="access-actions">
+                        <a class="button button-primary button-large" href="https://app.alfagroups.tech" target="_blank"
+                            rel="noopener">Launch Workstation</a>
+                        <a class="button button-secondary" href="../docs/quickstart.md">Quickstart Guide</a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CONTACT SECTION -->
+            <section class="section" id="contact">
+                <div class="container">
+                    <div class="section-heading">
+                        <div class="section-chip">Contact</div>
+                        <h2>Alfa Labs</h2>
+                        <p>For enterprise inquiries, custom deployments, or collaboration.</p>
+                    </div>
+                    <div class="contact-grid">
+                        <a class="contact-card" href="mailto:contact@alfagroups.tech">
+                            <strong>Email</strong>
+                            <span>contact@alfagroups.tech</span>
+                        </a>
+                        <a class="contact-card" href="https://github.com/Godwin1603/smart-evidence-writer" target="_blank"
+                            rel="noopener">
+                            <strong>GitHub</strong>
+                            <span>Open-source repository</span>
+                        </a>
+                        <a class="contact-card" href="https://www.linkedin.com" target="_blank" rel="noopener">
+                            <strong>LinkedIn</strong>
+                            <span>Organization presence</span>
+                        </a>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="container footer-grid">
+                <div>
+                    <strong>Alfa Hawk</strong>
+                    <p>Professional Forensic Evidence Workstation</p>
                 </div>
                 <div class="footer-links">
-                    <h4>Contact</h4>
+                    <a href="https://app.alfagroups.tech" target="_blank" rel="noopener">Platform</a>
+                    <a href="https://github.com/Godwin1603/smart-evidence-writer" target="_blank" rel="noopener">GitHub</a>
+                    <a href="../docs/system-overview.md">Documentation</a>
                     <a href="mailto:contact@alfagroups.tech">contact@alfagroups.tech</a>
-                    <a href="tel:+916379656950">+91 6379 656 950</a>
-                    <a href="https://www.linkedin.com/in/godwin1603" target="_blank" rel="noopener">LinkedIn</a>
+                </div>
+                <div class="footer-copy">
+                    <span>&copy; 2026 Alfa Labs, a child company of Alfa Groups.</span>
                 </div>
             </div>
-            <div class="footer-bottom">
-                <p>&copy; 2026 Alfa Groups. All rights reserved. Alfa Hawk&trade; is a registered product of Alfa Labs.
-                </p>
+        </footer>
+    </div>
+
+    <!-- REPORT MODAL - Kept the same -->
+    <div class="report-modal" id="reportModal" aria-hidden="true">
+        <div class="report-modal-backdrop" data-close-modal="true"></div>
+        <div class="report-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="reportModalTitle">
+            <div class="report-modal-header">
+                <div>
+                    <span class="section-chip subtle-chip">Report Viewer</span>
+                    <h3 id="reportModalTitle">Example Report</h3>
+                    <p id="reportModalFile" class="mono">report.pdf</p>
+                </div>
+                <button class="modal-close" id="modalClose" type="button" aria-label="Close report viewer">&times;</button>
+            </div>
+            <div class="report-modal-body">
+                <iframe id="reportFrame" title="Report preview" loading="lazy"></iframe>
             </div>
         </div>
-    </footer>
+    </div>
 
     <script src="script.js"></script>
 </body>
