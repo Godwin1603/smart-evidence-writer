@@ -69,7 +69,7 @@ def build_forensic_report(raw_analysis, metadata, frames=None, case_data=None, e
         engine_version: string
     """
     case_info = case_data or {}
-    frames = frames or {}
+    frames = _annotate_frames(frames or {})
     # V4.0 Precision Data Mapping
     # Create a lookup map: "F1" -> UUID, "F2" -> UUID, etc.
     frame_map = {f"F{i+1}": fid for i, fid in enumerate(frames.keys())}
@@ -99,7 +99,7 @@ def build_forensic_report(raw_analysis, metadata, frames=None, case_data=None, e
         'video_quality_assessment': _build_video_quality_assessment(raw_analysis.get('video_quality_assessment', {})),
 
         # ── V2: Incident Reconstruction ──
-        'incident_phases': _build_incident_phases(raw_analysis.get('incident_phases', []), frame_map),
+        'incident_phases': _build_incident_phases(raw_analysis.get('incident_phases', []), frames, frame_map),
 
         # ── V2: Person Registry (P-ID system) ──
         'persons_identified': _build_person_registry(raw_analysis.get('persons', raw_analysis.get('human_faces', [])), frames, frame_map),
@@ -121,7 +121,7 @@ def build_forensic_report(raw_analysis, metadata, frames=None, case_data=None, e
         'vehicle_registry': _build_vehicle_registry(raw_analysis.get('number_plates', []), frames),
 
         # ── Timeline ──
-        'timeline': _build_timeline(raw_analysis, frame_map),
+        'timeline': _build_timeline(raw_analysis, frames, frame_map),
 
         # ── Landmarks ──
         'landmarks_locations': _build_landmarks_section(raw_analysis.get('landmarks', [])),
@@ -137,7 +137,7 @@ def build_forensic_report(raw_analysis, metadata, frames=None, case_data=None, e
         'ai_limitations': raw_analysis.get('ai_limitations', []),
 
         # ── V2: Evidence Frame Index ──
-        'evidence_frame_index': _build_evidence_frame_index(frames, raw_analysis),
+        'evidence_frame_index': _build_evidence_frame_index(frames, raw_analysis, frame_map),
 
         # ── V2: AI Processing Disclosure ──
         'ai_processing_disclosure': _build_ai_processing_disclosure(),
@@ -266,6 +266,88 @@ def _build_detailed_analysis(analysis):
     return sections
 
 
+def _annotate_frames(frames):
+    annotated = {}
+    for i, (frame_id, frame_data) in enumerate(frames.items()):
+        entry = dict(frame_data)
+        entry['frame_id'] = frame_id
+        entry['frame_ref'] = f'F{i + 1}'
+        annotated[frame_id] = entry
+    return annotated
+
+
+def _parse_time_to_seconds(value):
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not isinstance(value, str):
+        return None
+
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    if '-' in cleaned:
+        cleaned = cleaned.split('-', 1)[0].strip()
+
+    fractional = 0.0
+    if '.' in cleaned:
+        main, frac = cleaned.split('.', 1)
+        cleaned = main
+        digits = ''.join(ch for ch in frac if ch.isdigit())
+        fractional = float(f"0.{digits}") if digits else 0.0
+
+    parts = [part for part in cleaned.split(':') if part != '']
+    try:
+        numbers = [int(part) for part in parts]
+    except ValueError:
+        return None
+
+    if len(numbers) == 3:
+        return numbers[0] * 3600 + numbers[1] * 60 + numbers[2] + fractional
+    if len(numbers) == 2:
+        return numbers[0] * 60 + numbers[1] + fractional
+    if len(numbers) == 1:
+        return numbers[0] + fractional
+    return None
+
+
+def _find_nearest_frame_id(frames, seconds):
+    if seconds is None or not frames:
+        return None
+
+    nearest_id = None
+    nearest_delta = None
+    for frame_id, frame_data in frames.items():
+        frame_seconds = frame_data.get('timestamp')
+        if frame_seconds is None:
+            frame_seconds = _parse_time_to_seconds(frame_data.get('timestamp_formatted'))
+        if frame_seconds is None:
+            continue
+        delta = abs(frame_seconds - seconds)
+        if nearest_delta is None or delta < nearest_delta:
+            nearest_id = frame_id
+            nearest_delta = delta
+    return nearest_id
+
+
+def _resolve_frame_reference(raw_frame, raw_time, frames, frame_map=None):
+    if raw_frame and raw_frame in frames:
+        return raw_frame
+    if raw_frame and frame_map and raw_frame in frame_map:
+        mapped = frame_map[raw_frame]
+        if mapped in frames:
+            return mapped
+
+    nearest_frame = _find_nearest_frame_id(frames, _parse_time_to_seconds(raw_time))
+    if nearest_frame:
+        return nearest_frame
+
+    if raw_frame and frame_map and raw_frame in frame_map:
+        return frame_map[raw_frame]
+    return raw_frame or 'N/A'
+
+
 def _build_violations_section(violations, frames):
     """Build violations section with linked evidence frames."""
     enriched = []
@@ -363,20 +445,24 @@ def _build_landmarks_section(landmarks):
     return enriched
 
 
-def _build_timeline(analysis, frame_map=None):
+def _build_timeline(analysis, frames, frame_map=None):
     """Build chronological timeline of events."""
     # Try both common keys for timeline events
     events = analysis.get('timeline_events', analysis.get('timeline', []))
     timeline = []
     for i, e in enumerate(events):
         raw_frame = e.get('evidence_frame', '')
-        evidentiary_frame = frame_map.get(raw_frame, raw_frame) if frame_map else raw_frame
+        raw_time = e.get('time_indicator', e.get('time', ''))
+        evidentiary_frame = _resolve_frame_reference(raw_frame, raw_time, frames, frame_map)
+        matched_frame = frames.get(evidentiary_frame, {})
         
         timeline.append({
             'sequence': i + 1,
-            'time': e.get('time_indicator', e.get('time', f'Event {i + 1}')),
+            'time': raw_time or matched_frame.get('timestamp_formatted', f'Event {i + 1}'),
             'event': e.get('event', e.get('description', 'No description')),
             'evidence_frame': evidentiary_frame,
+            'evidence_frame_ref': matched_frame.get('frame_ref', raw_frame or 'N/A'),
+            'frame_timestamp': matched_frame.get('timestamp_formatted', ''),
         })
     return timeline
 
@@ -404,6 +490,7 @@ def _build_exhibits(frames, analysis, frame_map=None):
             frame = frames[frame_id]
             exhibits.append({
                 'frame_id': frame_id,
+                'frame_ref': frame.get('frame_ref', ''),
                 'base64': frame.get('base64', ''),
                 'timestamp': frame.get('timestamp_formatted', '00:00:00'),
                 'description': frame.get('description', ''),
@@ -415,6 +502,7 @@ def _build_exhibits(frames, analysis, frame_map=None):
         if frame_id not in finding_frames:
             exhibits.append({
                 'frame_id': frame_id,
+                'frame_ref': frame.get('frame_ref', ''),
                 'base64': frame.get('base64', ''),
                 'timestamp': frame.get('timestamp_formatted', '00:00:00'),
                 'description': frame.get('description', ''),
@@ -471,6 +559,7 @@ def _build_evidence_integrity(metadata):
     if metadata.get('fps'):
         integrity['frame_rate'] = f"{metadata['fps']} FPS"
     if metadata.get('duration_seconds'):
+        integrity['duration_seconds'] = metadata['duration_seconds']
         mins = int(metadata['duration_seconds'] // 60)
         secs = int(metadata['duration_seconds'] % 60)
         integrity['duration'] = f"{mins}m {secs}s"
@@ -480,7 +569,7 @@ def _build_evidence_integrity(metadata):
     return integrity
 
 
-def _build_incident_phases(phases, frame_map=None):
+def _build_incident_phases(phases, frames, frame_map=None):
     """Build incident reconstruction phases table."""
     if not phases:
         return []
@@ -488,7 +577,8 @@ def _build_incident_phases(phases, frame_map=None):
     enriched = []
     for i, phase in enumerate(phases):
         raw_frame = phase.get('evidence_frame', 'N/A')
-        evidentiary_frame = frame_map.get(raw_frame, raw_frame) if frame_map else raw_frame
+        evidentiary_frame = _resolve_frame_reference(raw_frame, phase.get('time_range', ''), frames, frame_map)
+        matched_frame = frames.get(evidentiary_frame, {})
         
         enriched.append({
             'phase': phase.get('phase', i + 1),
@@ -496,6 +586,7 @@ def _build_incident_phases(phases, frame_map=None):
             'time_range': phase.get('time_range', 'N/A'),
             'severity': phase.get('severity', 'low'),
             'evidence_frame': evidentiary_frame,
+            'evidence_frame_ref': matched_frame.get('frame_ref', raw_frame or 'N/A'),
         })
     return enriched
 
@@ -527,8 +618,10 @@ def _build_person_registry(persons, frames, frame_map=None):
 
     enriched = []
     for i, p in enumerate(persons):
-        raw_frame = p.get('first_seen', p.get('evidence_frame', p.get('frame_id', 'N/A')))
-        evidentiary_frame = frame_map.get(raw_frame, raw_frame) if frame_map else raw_frame
+        raw_frame = p.get('evidence_frame', p.get('frame_id', ''))
+        raw_time = p.get('first_seen', p.get('detected_at_timestamp', ''))
+        evidentiary_frame = _resolve_frame_reference(raw_frame, raw_time, frames, frame_map)
+        matched_frame = frames.get(evidentiary_frame, {})
         
         entry = {
             'index': i + 1,
@@ -536,8 +629,9 @@ def _build_person_registry(persons, frames, frame_map=None):
             'description': p.get('description', 'No description'),
             'observed_role': p.get('observed_role', p.get('role', p.get('relevance', 'unknown'))).lower().replace('suspect', 'possible aggressor').replace('victim', 'possible victim'),
             'visibility_confidence': p.get('visibility_confidence', 'N/A'),
-            'first_seen': p.get('first_seen', p.get('detected_at_timestamp', 'N/A')),
+            'first_seen': raw_time or matched_frame.get('timestamp_formatted', 'N/A'),
             'evidence_frame': evidentiary_frame,
+            'evidence_frame_ref': matched_frame.get('frame_ref', raw_frame or 'N/A'),
             'actions': p.get('actions', []),
             'activity': p.get('activity', ''),
             'position': p.get('position_in_frame', ''),
@@ -585,7 +679,7 @@ def _build_weapons_objects(objects):
     return enriched
 
 
-def _build_evidence_frame_index(frames, analysis):
+def _build_evidence_frame_index(frames, analysis, frame_map=None):
     """Build evidence frame index (F1, F2, F3…) referenced by other sections."""
     if not frames:
         return []
@@ -596,9 +690,15 @@ def _build_evidence_frame_index(frames, analysis):
         findings = []
         
         # V2.1: Priority to short findings from Gemini
-        timeline = analysis.get('timeline_events', [])
+        timeline = analysis.get('timeline_events', analysis.get('timeline', []))
         for event in timeline:
-            if event.get('evidence_frame') == f'F{i+1}' or event.get('evidence_frame') == frame_id:
+            resolved_frame = _resolve_frame_reference(
+                event.get('evidence_frame', ''),
+                event.get('time_indicator', event.get('time', '')),
+                frames,
+                frame_map,
+            )
+            if resolved_frame == frame_id or event.get('evidence_frame') == f'F{i+1}':
                 if event.get('short_finding'):
                     findings.append(event.get('short_finding'))
         

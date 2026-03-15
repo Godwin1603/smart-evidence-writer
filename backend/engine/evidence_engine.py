@@ -101,11 +101,17 @@ class EvidenceEngine:
         update_prog(10, "Extracting media metadata...")
         metadata = get_media_metadata(file_bytes, filename)
         metadata['sha256'] = file_hash
+        metadata['evidence_sha256'] = file_hash
 
         update_prog(20, "Extracting evidence frames for analysis...")
         ext = os.path.splitext(filename)[1].lower()
         if ext in {'.mp4', '.mov', '.avi'}:
-            frames = extract_key_frames(file_bytes, original_filename=filename)
+            frames = extract_key_frames(
+                file_bytes,
+                max_frames=24,
+                interval_seconds=1,
+                original_filename=filename,
+            )
         else:
             frames = image_to_frame_entry(file_bytes, filename=filename)
         update_prog(35, f"Extracted {len(frames)} frames successfully.")

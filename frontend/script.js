@@ -16,6 +16,7 @@
     let clientId = null;
     let activeTab = 'overview';
     let currentFrameContext = null;
+    let renderDashboardTaskId = 0;
     const apiBaseMeta = document.querySelector('meta[name="alfa-hawk-api-base"]');
     const defaultApiBase = isLocalHost() ? '' : 'https://web-production-4c3f2.up.railway.app';
     const API_BASE = normalizeApiBase(window.ALFA_HAWK_API_BASE || apiBaseMeta?.content || defaultApiBase);
@@ -385,7 +386,7 @@
                     <div class="grid-card integrity-card">
                         <h3>Forensic Integrity Ledger</h3>
                         <div class="integrity-ledger">
-                            <div class="detail-row"><span class="detail-label">Evidence Hash:</span><span class="detail-value mono-tech truncate">${integrity.sha256 || '--'}</span></div>
+                            <div class="detail-row"><span class="detail-label">Evidence Hash:</span><span class="detail-value mono-tech truncate">${integrity.sha256 || integrity.evidence_sha256 || '--'}</span></div>
                             <div class="detail-row"><span class="detail-label">Report ID:</span><span class="detail-value mono-tech">${hdr.report_id || '--'}</span></div>
                             <div class="detail-row"><span class="detail-label">AI Model:</span><span class="detail-value mono-tech">${aiMeta.model || 'Gemini 2.5 Flash'}</span></div>
                             <div class="detail-row"><span class="detail-label">Signature:</span><span class="detail-value mono-tech truncate">${report.report_integrity_hash || '--'}</span></div>
@@ -437,10 +438,10 @@
                     </div>
                     <div class="timeline-evidence-row">
                         <button class="frame-preview-button" type="button" onclick="event.stopPropagation(); window.__openTimelineEvent(${idx});">
-                            ${frame?.base64 ? `<img src="data:image/jpeg;base64,${frame.base64}" alt="Frame ${esc(t.evidence_frame || '')}" loading="lazy">` : '<div class="frame-preview-placeholder">NO FRAME</div>'}
+                            ${frame?.base64 ? `<img src="data:image/jpeg;base64,${frame.base64}" alt="Frame ${esc(t.evidence_frame || '')}" loading="lazy" decoding="async">` : '<div class="frame-preview-placeholder">NO FRAME</div>'}
                             <div class="frame-preview-meta">
                                 <span class="frame-preview-label">Frame</span>
-                                <span class="frame-preview-id mono-tech">${esc(t.evidence_frame || 'N/A')}</span>
+                                <span class="frame-preview-id mono-tech">${esc(t.evidence_frame_ref || getFrameDisplayId(frame, t.evidence_frame || 'N/A'))}</span>
                             </div>
                         </button>
                         <div class="timeline-evidence-text">
@@ -470,7 +471,7 @@
                             <td><span class="role-badge role-${(p.observed_role || 'unknown').toLowerCase().replace(' ', '-')}">${esc(p.observed_role)}</span></td>
                             <td class="mono-tech">${esc(p.first_seen)}</td>
                             <td>${esc(p.visibility_confidence)}</td>
-                            <td class="mono-tech"><span class="frame-tag" onclick="window.__openEvidenceFrame('${p.evidence_frame}')">${esc(p.evidence_frame || 'N/A')}</span></td>
+                            <td class="mono-tech"><span class="frame-tag" onclick="window.__openEvidenceFrame('${p.evidence_frame}')">${esc(p.evidence_frame_ref || p.evidence_frame || 'N/A')}</span></td>
                         </tr>
                     `).join('')}
                 </tbody>
@@ -523,10 +524,10 @@
             if (!f.base64) return;
             framesHtml += `
             <div class="frame-card" onclick="window.__openEvidenceFrame('${f.frame_id || ''}')">
-                <img src="data:image/jpeg;base64,${f.base64}" alt="Evidence" loading="lazy">
+                <img src="data:image/jpeg;base64,${f.base64}" alt="Evidence" loading="lazy" decoding="async">
                 <div class="frame-meta">
                     <span class="mono-tech">${esc(f.timestamp || '--')}</span>
-                    <span class="id-tag">${esc(f.frame_id || '')}</span>
+                    <span class="id-tag">${esc(f.frame_ref || f.frame_id || '')}</span>
                 </div>
                 <div class="frame-observation-overlay">${esc(f.description || 'Observation')}</div>
             </div>`;
@@ -762,7 +763,13 @@
     }
 
     function findFrameById(frameId) {
-        return (currentReport?.evidence_exhibits || []).find(f => f.frame_id === frameId);
+        return (currentReport?.evidence_exhibits || []).find(
+            (f) => f.frame_id === frameId || f.frame_ref === frameId
+        );
+    }
+
+    function getFrameDisplayId(frame, fallbackId = 'N/A') {
+        return frame?.frame_ref || frame?.frame_id || fallbackId;
     }
 
     function timeToSeconds(timeValue) {
@@ -817,11 +824,11 @@
         return `
             <button class="mini-frame-card" type="button" onclick="event.stopPropagation(); window.__openEvidenceFrame('${esc(frameId || '')}', ${JSON.stringify(meta).replace(/"/g, '&quot;')});">
                 <div class="mini-frame-thumb">
-                    ${frame?.base64 ? `<img src="data:image/jpeg;base64,${frame.base64}" alt="${esc(frameId || 'Evidence frame')}" loading="lazy">` : '<div class="mini-frame-fallback">NO IMAGE</div>'}
+                    ${frame?.base64 ? `<img src="data:image/jpeg;base64,${frame.base64}" alt="${esc(frameId || 'Evidence frame')}" loading="lazy" decoding="async">` : '<div class="mini-frame-fallback">NO IMAGE</div>'}
                 </div>
                 <div class="mini-frame-details">
                     <span class="mini-frame-label">${esc(contextLabel)}</span>
-                    <span class="mini-frame-id mono-tech">${esc(frameId || 'N/A')}</span>
+                    <span class="mini-frame-id mono-tech">${esc(getFrameDisplayId(frame, frameId || 'N/A'))}</span>
                 </div>
             </button>
         `;
