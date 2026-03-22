@@ -7,18 +7,42 @@
     'use strict';
 
     // ═══════════════════════════════════════════════════
-    // STATE
+    // STATE ARCHITECTURE
     // ═══════════════════════════════════════════════════
+    const AppState = {
+        report: null,              
+        media: { duration: 0, type: null }, 
+        viewMode: 'investigation', // 'investigation' | 'report'
+        activeEventIndex: -1,      
+        analysisMode: 'platform',  // 'platform' | 'byo'
+    };
+
+    /**
+     * CRITICAL: The ONLY way to mutate state.
+     * Patches the AppState and dispatches 'StateChanged' to trigger UI re-renders.
+     */
+    function updateState(patch) {
+        Object.assign(AppState, patch);
+        document.dispatchEvent(new CustomEvent('StateChanged'));
+    }
+
+    // Helper accessors
+    function getActiveEvent() { return AppState.report?.timeline?.[AppState.activeEventIndex] || null; }
+    function getActiveFrame() {
+        const event = getActiveEvent();
+        if (!event || !event.evidence_frame || !AppState.report?.video_context?.extracted_frames) return null;
+        return AppState.report.video_context.extracted_frames.find(f => f.frame_id === event.evidence_frame) || null;
+    }
+
+    // Legacy State (To be migrated)
     let selectedFile = null;
     let currentSessionId = null;
-    let currentReport = null;
     let pollTimer = null;
     let clientId = null;
-    let activeTab = 'overview';
-    let currentFrameContext = null;
     let renderDashboardTaskId = 0;
+
     const apiBaseMeta = document.querySelector('meta[name="alfa-hawk-api-base"]');
-    const defaultApiBase = isLocalHost() ? '' : 'https://web-production-4c3f2.up.railway.app';
+    const defaultApiBase = isLocalHost() ? '' : (window.location.protocol === 'file:' ? 'http://127.0.0.1:5000' : 'https://web-production-4c3f2.up.railway.app');
     const API_BASE = normalizeApiBase(window.ALFA_HAWK_API_BASE || apiBaseMeta?.content || defaultApiBase);
     const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.mp4', '.mov', '.avi', '.wav']);
 
@@ -37,12 +61,23 @@
     }
 
     // ═══════════════════════════════════════════════════
-    // INITIALIZATION — CLIENT ID & PERSISTENCE
+    // INITIALIZATION & PERSISTENCE
     // ═══════════════════════════════════════════════════
     function init() {
         initClientId();
+        restoreSessionApiKey();
         setupEventListeners();
-        fetchUsageStats(); // Try to get usage stats
+        fetchUsageStats();
+    }
+
+    function restoreSessionApiKey() {
+        const storedKey = sessionStorage.getItem('alfa_hawk_api_key');
+        if (storedKey) {
+            updateState({ analysisMode: 'byo' });
+            $('#ai-api-key').value = storedKey;
+            $('input[name="analysisMode"][value="byo"]').checked = true;
+            $('#byo-key-group').style.display = 'flex';
+        }
     }
 
     function initClientId() {
@@ -71,7 +106,7 @@
     const selectFileBtn = $('#selectFileBtn');
     const fileInfo = $('#file-info');
     const analyzeBtn = $('#analyzeBtn');
-    const workspace = $('#workspace');
+    const centerColumn = $('#center-column');
     
     // Views
     const viewInitial = $('#view-initial');
@@ -79,9 +114,15 @@
     const viewResults = $('#view-results');
     const viewError = $('#view-error');
 
-    // Tab buttons
-    const tabBtns = $$('.tab-btn');
-    const tabContents = $$('.tab-content');
+    // New 3-Column 
+    const fvEmpty = $('#fv-empty');
+    const fvLoading = $('#fv-loading');
+    const fvMissing = $('#fv-missing');
+    const fvActive = $('#fv-active');
+    const fvImage = $('#fv-image');
+    
+    const epAiObservation = $('#ep-ai-observation');
+    const epFramesRow = $('#ep-frames-row');
 
     // ═══════════════════════════════════════════════════
     // EVENT LISTENERS
@@ -107,21 +148,52 @@
             });
         });
 
-        tabBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const tabId = btn.getAttribute('data-tab');
-                switchTab(tabId);
+        analyzeBtn.addEventListener('click', startAnalysis);
+        $('#retryBtn').addEventListener('click', resetAll);
+        
+        // Evidence Panel Buttons
+        const epPdfBtn = document.querySelector('#evidence-panel #downloadPdfBtn');
+        const epJsonBtn = document.querySelector('#evidence-panel #downloadJsonBtn');
+        if (epPdfBtn) epPdfBtn.addEventListener('click', downloadPdf);
+        if (epJsonBtn) epJsonBtn.addEventListener('click', downloadJson);
+        
+        document.addEventListener('StateChanged', renderInvestigationView);
+
+        // Evidence Panel Reference Tabs
+        $$('.ep-ref-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const ref = tab.getAttribute('data-ref');
+                $$('.ep-ref-tab').forEach(t => t.classList.toggle('active', t === tab));
+                $$('.ep-ref-pane').forEach(p => {
+                    const isActive = p.id === `ref-${ref}`;
+                    p.classList.toggle('active', isActive);
+                    p.style.display = isActive ? 'block' : 'none';
+                });
             });
         });
 
-        analyzeBtn.addEventListener('click', startAnalysis);
-        $('#retryBtn').addEventListener('click', resetAll);
-        $('#downloadPdfBtn').addEventListener('click', downloadPdf);
-        $('#downloadJsonBtn').addEventListener('click', downloadJson);
+        // Frame viewer navigation arrows
+        const nextBtn = $('.fv-nav-next');
+        const prevBtn = $('.fv-nav-prev');
+        if (nextBtn) nextBtn.addEventListener('click', () => navigateEvent(1));
+        if (prevBtn) prevBtn.addEventListener('click', () => navigateEvent(-1));
         
-        $('.lightbox-close').addEventListener('click', closeLightbox);
-        $('.lightbox-overlay').addEventListener('click', closeLightbox);
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLightbox(); });
+        // Global keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (AppState.activeEventIndex === -1 || !AppState.report) return;
+            // Ignore if focus is in an input or textarea
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+            
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                navigateEvent(1);
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                navigateEvent(-1);
+            }
+        });
+        
+        setupFrameZoomPan();
 
         // Connectivity Monitor
         window.addEventListener('online', () => updateConnectionStatus('online'));
@@ -253,6 +325,9 @@
             if (isByo) {
                 const key = $('#ai-api-key').value.trim();
                 formData.append('ai_api_key', key);
+                sessionStorage.setItem('alfa_hawk_api_key', key);
+            } else {
+                sessionStorage.removeItem('alfa_hawk_api_key');
             }
 
             const uploadRes = await fetch(apiUrl('/api/upload'), { 
@@ -262,7 +337,11 @@
             });
 
             if (!uploadRes.ok) {
-                const err = await uploadRes.json();
+                const errStatus = uploadRes.status;
+                const err = await uploadRes.json().catch(() => ({}));
+                if (errStatus === 401 || (err.error && err.error.toLowerCase().includes('api key'))) {
+                    throw new Error('Invalid or missing API Key. Please check your AI API key setting.');
+                }
                 throw new Error(err.error || 'Upload failed');
             }
 
@@ -272,10 +351,17 @@
             markStepDone('validate');
             updateProgress(15, 'Extracting forensics frames...', 'extract');
 
-            await fetch(apiUrl(`/api/analyze/${currentSessionId}`), { 
+            const analyzeRes = await fetch(apiUrl(`/api/analyze/${currentSessionId}`), { 
                 method: 'POST',
                 headers: { 'X-Client-ID': clientId }
             });
+            
+            if (!analyzeRes.ok) {
+                const errStatus = analyzeRes.status;
+                if (errStatus === 401) {
+                    throw new Error('Invalid or missing API Key. Please check your AI API key setting.');
+                }
+            }
 
             startPolling();
         } catch (err) {
@@ -318,13 +404,15 @@
 
             if (status === 'complete') {
                 markStepDone('report');
-                currentReport = data.report;
-                renderDashboard(data.report);
+                updateState({ report: data.report, activeEventIndex: 0 });
                 showSection('results');
                 fetchUsageStats();
             } else if (status === 'error') {
                 showSection('error');
-                $('#error-message').textContent = data.error || 'AI analysis failed';
+                const errMsg = data.error || 'AI analysis failed';
+                $('#error-message').textContent = errMsg.toLowerCase().includes('api key') 
+                    ? 'Invalid or missing API Key. Please check your AI API key setting.' 
+                    : errMsg;
             } else {
                 pollTimer = setTimeout(pollStatus, pollInterval);
             }
@@ -338,209 +426,165 @@
     }
 
     // ═══════════════════════════════════════════════════
-    // DASHBOARD RENDERING
+    // RENDER INVESTIGATION VIEW (Phase 3)
     // ═══════════════════════════════════════════════════
-    function renderDashboard(report) {
+    function renderInvestigationView() {
+        const report = AppState.report;
         if (!report) return;
-        currentReport = report;
 
-        // ═══════════════════════════════════════════════════
-        // HEADER & EXPORT SYNC
-        // ═══════════════════════════════════════════════════
-        const hdr = report.header || {};
-        $('#report-header-preview').innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:1px solid var(--border-color); padding-bottom:1rem; margin-bottom:1.5rem;">
-                <div>
-                    <h2 style="font-size:1.5rem; margin-bottom:0.25rem;">${esc(hdr.report_title || 'FORENSIC REPORT')}</h2>
-                    <span class="mono-tech" style="color:var(--text-muted);">ID: ${esc(hdr.report_id || 'UNKNOWN')}</span>
-                </div>
-                <div style="text-align:right">
-                    <div style="font-size:0.8rem; font-weight:700; color:var(--accent-crimson);">${esc(hdr.classification || 'RESTRICTED')}</div>
-                    <div class="mono-tech" style="color:var(--text-secondary);">${esc(hdr.date || '')} ${esc(hdr.time || '')}</div>
-                </div>
-            </div>
-        `;
-
-        $('#export-confidence').textContent = `${report.confidence_score || 0}%`;
-        $('#export-frames').textContent = (report.evidence_exhibits || []).length;
-        $('#export-status').textContent = 'READY';
-
-        // ═══════════════════════════════════════════════════
-        // 1. OVERVIEW — INTEGRITY LEDGER & PHASES
-        // ═══════════════════════════════════════════════════
-        const aiMeta = report.ai_metadata || {};
-        const integrity = report.evidence_integrity || {};
-        
-        const phaseCardsHtml = buildPhaseCards(report);
-        let overviewHtml = `
-            <div class="overview-shell">
-                <div class="overview-main-column">
-                    <div class="grid-card phases-card">
-                        <div class="section-header">
-                            <div>
-                                <span class="section-kicker">Overview</span>
-                                <h3>Incident Phase Reconstruction</h3>
-                            </div>
-                            <span class="section-meta mono-tech">${(report.incident_phases || []).length} phases</span>
-                        </div>
-                        <div class="phase-cards-track">
-                            ${phaseCardsHtml}
-                        </div>
-                    </div>
-                </div>
-                <div class="overview-side-column">
-                    <div class="grid-card integrity-card">
-                        <h3>Forensic Integrity Ledger</h3>
-                        <div class="integrity-ledger">
-                            <div class="detail-row"><span class="detail-label">Evidence Hash:</span><span class="detail-value mono-tech truncate">${integrity.sha256 || integrity.evidence_sha256 || '--'}</span></div>
-                            <div class="detail-row"><span class="detail-label">Report ID:</span><span class="detail-value mono-tech">${hdr.report_id || '--'}</span></div>
-                            <div class="detail-row"><span class="detail-label">AI Model:</span><span class="detail-value mono-tech">${aiMeta.model || 'Gemini 2.5 Flash'}</span></div>
-                            <div class="detail-row"><span class="detail-label">Signature:</span><span class="detail-value mono-tech truncate">${report.report_integrity_hash || '--'}</span></div>
-                        </div>
-                        <div class="threat-level-section" style="margin-top:1.5rem">
-                             <span class="detail-label">INDICATIVE THREAT LEVEL:</span>
-                             <div id="threat-indicator" class="threat-box threat-${(report.risk_assessment?.threat_level || 'LOW').toLowerCase()}">${(report.risk_assessment?.threat_level || 'LOW')}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        $('#tab-overview').innerHTML = overviewHtml;
-
-        // ═══════════════════════════════════════════════════
-        // 2. TIMELINE — SCRUBBER & LIST
-        // ═══════════════════════════════════════════════════
         const timeline = report.timeline || [];
-        const duration = report.evidence_integrity?.duration_seconds || 10;
-        $('#scrubber-end').textContent = report.evidence_integrity?.duration || '00:10';
+        const activeIdx = AppState.activeEventIndex;
         
-        let timeHtml = '';
-        let markersHtml = '';
-        let firstMarkerPercent = 0;
-        
-        timeline.forEach((t, idx) => {
-            const timeStr = t.time || '00:00';
-            const totalSecs = timeToSeconds(timeStr);
-            const percent = Math.min(100, (totalSecs / duration) * 100);
-            const frame = findFrameById(t.evidence_frame);
-            const subjects = inferSubjectsFromEntry(t, report);
-            const observation = frame?.description || t.event || 'No frame observation available.';
-
-            if (idx === 0) firstMarkerPercent = percent;
+        // 1. Render Timeline Dots & Event List
+        if (timeline.length > 0) {
+            const duration = report.evidence_integrity?.duration_seconds || 10;
             
-            markersHtml += `<button class="marker marker-button" type="button" style="left: ${percent}%" title="${esc(t.event || '')}" onclick="window.__openTimelineEvent(${idx})"></button>`;
+            let dotsHtml = '';
+            let listHtml = '';
             
-            timeHtml += `
-            <article id="timeline-event-${idx}" class="timeline-item interactive-node" onclick="window.__openTimelineEvent(${idx})">
-                <div class="timeline-node-dot"></div>
-                <div class="timeline-content">
-                    <div class="timeline-head">
-                        <span class="timeline-time mono-tech">${esc(timeStr)}</span>
-                        <span class="timeline-sequence mono-tech">Event ${(t.sequence || idx + 1)}</span>
-                    </div>
-                    <p class="timeline-event">${esc(t.event || '')}</p>
-                    <div class="timeline-subjects">
-                        ${subjects.length ? subjects.map(subject => `<span class="subject-chip">${esc(subject)}</span>`).join('') : '<span class="subject-chip subject-chip-muted">Unassigned subjects</span>'}
-                    </div>
-                    <div class="timeline-evidence-row">
-                        <button class="frame-preview-button" type="button" onclick="event.stopPropagation(); window.__openTimelineEvent(${idx});">
-                            ${frame?.base64 ? `<img src="data:image/jpeg;base64,${frame.base64}" alt="Frame ${esc(t.evidence_frame || '')}" loading="lazy" decoding="async">` : '<div class="frame-preview-placeholder">NO FRAME</div>'}
-                            <div class="frame-preview-meta">
-                                <span class="frame-preview-label">Frame</span>
-                                <span class="frame-preview-id mono-tech">${esc(t.evidence_frame_ref || getFrameDisplayId(frame, t.evidence_frame || 'N/A'))}</span>
-                            </div>
-                        </button>
-                        <div class="timeline-evidence-text">
-                            <span class="evidence-link-label">Associated evidence frame</span>
-                            <span class="timeline-observation">${esc(observation)}</span>
+            timeline.forEach((t, idx) => {
+                const timeStr = t.time || '00:00';
+                const totalSecs = timeToSeconds(timeStr);
+                const percent = Math.min(100, duration ? (totalSecs / duration) * 100 : 0);
+                const isActive = idx === activeIdx;
+                
+                // Timeline Dot
+                dotsHtml += `<div class="tl-dot ${isActive ? 'active' : ''}" style="left: ${percent}%" title="${esc(t.event)}" onclick="window.__openTimelineEvent(${idx})"></div>`;
+                
+                // Event Card
+                const frame = findFrameById(t.evidence_frame);
+                listHtml += `
+                    <div class="event-card ${isActive ? 'active' : ''}" id="event-card-${idx}" onclick="window.__openTimelineEvent(${idx})">
+                        ${frame?.base64 ? `<img src="data:image/jpeg;base64,${frame.base64}" class="event-card-thumb">` : `<div class="event-card-thumb" style="background:#eee"></div>`}
+                        <div class="event-card-body">
+                            <span class="event-card-time">${esc(timeStr)}</span>
+                            <span class="event-card-title">${esc(t.event)}</span>
+                            <span class="event-card-desc">${esc(frame?.description || 'No observation')}</span>
                         </div>
                     </div>
-                </div>
-            </article>`;
-        });
-        
-        $('#timeline-markers').innerHTML = markersHtml;
-        $('#timeline-list').innerHTML = timeHtml || '<p class="text-muted">No timeline data.</p>';
-        updateScrubberPosition(timeline.length ? firstMarkerPercent : 0);
-
-        // ═══════════════════════════════════════════════════
-        // 3. PERSONS — INVESTIGATION TABLE
-        // ═══════════════════════════════════════════════════
-        const persons = report.persons_identified || [];
-        let pTableHtml = `
-            <table class="investigation-table">
-                <thead><tr><th>ID</th><th>Observed Role</th><th>First Seen</th><th>Visibility</th><th>Evidentiary Link</th></tr></thead>
-                <tbody>
-                    ${persons.map(p => `
-                        <tr>
-                            <td class="id-cell">${esc(p.person_id)}</td>
-                            <td><span class="role-badge role-${(p.observed_role || 'unknown').toLowerCase().replace(' ', '-')}">${esc(p.observed_role)}</span></td>
-                            <td class="mono-tech">${esc(p.first_seen)}</td>
-                            <td>${esc(p.visibility_confidence)}</td>
-                            <td class="mono-tech"><span class="frame-tag" onclick="window.__openEvidenceFrame('${p.evidence_frame}')">${esc(p.evidence_frame_ref || p.evidence_frame || 'N/A')}</span></td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
-        $('#persons-table-container').innerHTML = persons.length ? pTableHtml : '<p class="text-muted">No persons detected.</p>';
-
-        // ═══════════════════════════════════════════════════
-        // 4. OBJECTS CATEGORIZED
-        // ═══════════════════════════════════════════════════
-        const objects = report.weapons_objects || [];
-        // Grouping logic
-        const groups = { 'Vehicles': [], 'Weapons': [], 'Other Objects': [] };
-        objects.forEach(o => {
-            const cat = (o.object || '').toLowerCase().includes('car') || (o.object || '').toLowerCase().includes('motorcycle') || (o.object || '').toLowerCase().includes('suv') ? 'Vehicles' : 
-                        (o.object || '').toLowerCase().includes('gun') || (o.object || '').toLowerCase().includes('knife') || (o.object || '').toLowerCase().includes('weapon') ? 'Weapons' : 'Other Objects';
-            groups[cat].push(o);
-        });
-
-        let objRegistryHtml = '';
-        for (const [catName, items] of Object.entries(groups)) {
-            if (items.length === 0) continue;
-            objRegistryHtml += `
-                <div class="registry-group">
-                    <h4 class="registry-group-title">${catName}</h4>
-                    <table class="investigation-table">
-                        <thead><tr><th>Object Type</th><th>Timestamp</th><th>Reliability</th><th>Description</th></tr></thead>
-                        <tbody>
-                            ${items.map(i => `
-                                <tr>
-                                    <td style="font-weight:700">${esc(i.object)}</td>
-                                    <td class="mono-tech">${esc(i.timestamp)}</td>
-                                    <td>${i.confidence_percent || 75}%</td>
-                                    <td>${esc(i.description)}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
+                `;
+            });
+            
+            const timelineDotsEl = $('.timeline-dots');
+            if (timelineDotsEl) timelineDotsEl.innerHTML = dotsHtml;
+            
+            const eventListEl = $('.event-list');
+            if (eventListEl) eventListEl.innerHTML = listHtml;
+            
+            // Scroll active card into view
+            if (activeIdx >= 0 && eventListEl) {
+                const activeCard = $(`#event-card-${activeIdx}`);
+                if (activeCard) {
+                    activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
         }
-        $('#objects-registry-container').innerHTML = objRegistryHtml || '<p class="text-muted">No object inventory detected.</p>';
 
-        // ═══════════════════════════════════════════════════
-        // 5. FRAMES WITH LABELS
-        // ═══════════════════════════════════════════════════
-        const frames = report.evidence_exhibits || [];
-        let framesHtml = '';
-        frames.forEach(f => {
-            if (!f.base64) return;
-            framesHtml += `
-            <div class="frame-card" onclick="window.__openEvidenceFrame('${f.frame_id || ''}')">
-                <img src="data:image/jpeg;base64,${f.base64}" alt="Evidence" loading="lazy" decoding="async">
-                <div class="frame-meta">
-                    <span class="mono-tech">${esc(f.timestamp || '--')}</span>
-                    <span class="id-tag">${esc(f.frame_ref || f.frame_id || '')}</span>
-                </div>
-                <div class="frame-observation-overlay">${esc(f.description || 'Observation')}</div>
-            </div>`;
-        });
-        $('#frames-grid').innerHTML = framesHtml || '<p class="text-muted">No exhibits.</p>';
+        // 2. Render Active Frame & Evidence Panel
+        const frame = getActiveFrame();
+        const event = getActiveEvent();
+        
+        // Hide all viewer states
+        fvEmpty.classList.remove('active');
+        fvLoading.classList.remove('active');
+        fvMissing.classList.remove('active');
+        fvActive.classList.remove('active');
 
-        switchTab('overview');
+        if (!report) {
+            fvEmpty.classList.add('active');
+        } else if (!frame) {
+            fvMissing.classList.add('active');
+        } else {
+            // Render Active Frame
+            fvActive.classList.add('active');
+            fvImage.src = `data:image/jpeg;base64,${frame.base64}`;
+            
+            // Overlays
+            const idBadge = $('#fv-badge-id');
+            const confBadge = $('#fv-badge-conf');
+            const timeBadge = $('#fv-badge-time');
+            const eventLabel = $('#fv-event-title');
+            
+            if (idBadge) idBadge.textContent = esc(frame.frame_ref || frame.frame_id);
+            if (confBadge) confBadge.textContent = `${frame.confidence_percent || 99}% CONF`;
+            if (timeBadge) timeBadge.textContent = esc(frame.timestamp || event?.time || '--');
+            if (eventLabel) eventLabel.textContent = esc(event?.event || 'Evidence Reference');
+            
+            // Render Evidence Panel
+            if (epAiObservation) {
+                epAiObservation.innerHTML = `<strong>AI Analysis:</strong> ${esc(frame.description || event?.event || 'No detailed analysis available.')}`;
+            }
+            
+            if (epFramesRow) {
+                // Determine linked frames (all frames for the event's subjects)
+                const subjects = inferSubjectsFromEntry(event, report);
+                const allFrames = report.evidence_exhibits || [];
+                let linkedHtml = '';
+                
+                allFrames.forEach((f, fIdx) => {
+                    // Very basic linking simulation: if same frame or just show a few
+                    if (f.frame_id === frame.frame_id || (fIdx < 3)) {
+                        const isPrimary = f.frame_id === frame.frame_id;
+                        linkedHtml += `<img src="data:image/jpeg;base64,${f.base64}" title="${esc(f.frame_ref || f.frame_id)}" class="${isPrimary ? 'active' : ''}" onclick="window.__openEvidenceFrame('${f.frame_id}')">`;
+                    }
+                });
+                epFramesRow.innerHTML = linkedHtml || '<p class="ep-body">No linked frames.</p>';
+            }
+        }
+        
+        // 3. Render Reference Drawer Data
+        if ($('#ref-persons')) {
+            const persons = report.persons_identified || [];
+            if (persons.length) {
+                $('#ref-persons').innerHTML = persons.map(p => `
+                    <div style="margin-bottom:0.5rem; font-size:var(--text-sm);">
+                        <strong>${esc(p.person_id)}</strong> - ${esc(p.observed_role)} 
+                        <br><span style="color:var(--text-muted)">Seen: ${esc(p.first_seen)}</span>
+                    </div>`).join('');
+            } else {
+                $('#ref-persons').innerHTML = '<span style="color:var(--text-muted); font-size:var(--text-sm);">No persons detected.</span>';
+            }
+        }
+        
+        if ($('#ref-objects')) {
+            const objects = report.weapons_objects || [];
+            if (objects.length) {
+                $('#ref-objects').innerHTML = objects.map(o => `
+                    <div style="margin-bottom:0.5rem; font-size:var(--text-sm);">
+                        <strong>${esc(o.object)}</strong> <span style="font-size:var(--text-xs); color:var(--text-muted);">(${o.confidence_percent}%)</span>
+                        <br><span style="color:var(--text-secondary)">${esc(o.description)}</span>
+                    </div>`).join('');
+            } else {
+                $('#ref-objects').innerHTML = '<span style="color:var(--text-muted); font-size:var(--text-sm);">No objects detected.</span>';
+            }
+        }
+        
+        if ($('#ref-frames')) {
+            const frames = report.evidence_exhibits || [];
+            if (frames.length) {
+                let fHtml = '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem;">';
+                frames.forEach(f => {
+                    if (!f.base64) return;
+                    fHtml += `<img src="data:image/jpeg;base64,${f.base64}" title="${esc(f.frame_ref || f.frame_id)}" onclick="window.__openEvidenceFrame('${f.frame_id}')" style="width:100%; border-radius:2px; cursor:pointer; border:1px solid var(--border-default);">`;
+                });
+                fHtml += '</div>';
+                $('#ref-frames').innerHTML = fHtml;
+            } else {
+                $('#ref-frames').innerHTML = '<span style="color:var(--text-muted); font-size:var(--text-sm);">No exhibits available.</span>';
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════
+    // INTERACTION LOGIC
+    // ═══════════════════════════════════════════════════
+    function navigateEvent(direction) {
+        if (!AppState.report || AppState.activeEventIndex === -1) return;
+        const timeline = AppState.report.timeline || [];
+        const newIdx = AppState.activeEventIndex + direction;
+        if (newIdx >= 0 && newIdx < timeline.length) {
+            updateState({ activeEventIndex: newIdx });
+        }
     }
 
     // ═══════════════════════════════════════════════════
@@ -552,16 +596,138 @@
         viewResults.style.display = 'none';
         viewError.style.display = 'none';
         
+        const viewReport = $('#view-report');
+        if (viewReport) viewReport.style.display = 'none';
+        
         switch(name) {
             case 'initial': viewInitial.style.display = 'block'; break;
             case 'progress': viewProgress.style.display = 'block'; break;
             case 'results': viewResults.style.display = 'block'; break;
             case 'error': viewError.style.display = 'block'; break;
+            case 'report': if (viewReport) viewReport.style.display = 'block'; break;
         }
     }
+    
+    window.__switchViewMode = (mode) => {
+        if (!AppState.report) return;
+        updateState({ viewMode: mode });
+        
+        // Update header buttons
+        const btnInv = $('#mode-investigation');
+        const btnRep = $('#mode-report');
+        if (btnInv) btnInv.classList.toggle('active', mode === 'investigation');
+        if (btnRep) btnRep.classList.toggle('active', mode === 'report');
+        
+        if (mode === 'report') {
+            showSection('report');
+            const ep = $('#evidence-panel');
+            if (ep) ep.style.display = 'none';
+            // Render the report view dynamically here or later in Phase 4
+            if (window.__renderReportMode) {
+                window.__renderReportMode();
+            }
+        } else {
+            showSection('results');
+            const ep = $('#evidence-panel');
+            if (ep) ep.style.display = '';
+        }
+    };
+
+    window.__renderReportMode = () => {
+        const report = AppState.report;
+        if (!report) return;
+        
+        const container = $('#report-container');
+        if (!container) return;
+        
+        const metadata = report.metadata || {};
+        const timeline = report.timeline || [];
+        const duration = report.evidence_integrity?.duration_seconds || '--';
+        
+        let html = `
+            <div class="report-header" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border-strong);">
+                <div>
+                    <h2 style="margin:0 0 0.5rem 0;">Alfa Hawk Forensic Report</h2>
+                    <div style="font-family:var(--font-mono); font-size:var(--text-sm); color:var(--text-secondary);">
+                        Case: ${esc(metadata.case_number || 'N/A')} &bull; Officer: ${esc(metadata.officer_id || 'N/A')} <br>
+                        Analysis ID: ${esc(metadata.analysis_id || 'N/A')} &bull; Duration: ${duration}s
+                    </div>
+                </div>
+                <div>
+                    <button id="btn-export-json" class="btn btn-ghost" onclick="window.__exportReportJson()" style="font-size: var(--text-sm);">Export JSON</button>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 2rem;">
+                <h3 style="margin-bottom: 1rem;">Chronological Reconstruction</h3>
+                <div style="display:flex; flex-direction:column; gap: 1rem;">
+        `;
+        
+        if (timeline.length === 0) {
+            html += '<p>No timeline events extracted.</p>';
+        } else {
+            timeline.forEach((t, idx) => {
+                const frame = findFrameById(t.evidence_frame);
+                const confPercent = frame ? (frame.confidence_percent || 99) : '--';
+                
+                html += `
+                    <div style="display:grid; grid-template-columns: 80px 1fr; gap: 1rem; padding: 1rem; border: 1px solid var(--border-default); border-radius: 2px; background: var(--surface-panel);">
+                        <div style="font-family:var(--font-mono); font-weight:600;">${esc(t.time || '00:00')}</div>
+                        <div>
+                            <div style="font-weight:600; margin-bottom: 0.25rem;">${esc(t.event)}</div>
+                            <div style="font-size:var(--text-sm); color:var(--text-secondary); margin-bottom: 0.5rem;">${esc(frame?.description || 'No detailed observation.')}</div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:var(--text-xs); color:var(--text-muted);">
+                                <span>Confidence: ${confPercent}%</span>
+                                <a href="#" onclick="event.preventDefault(); window.__jumpToInvestigation(${idx});" style="color:var(--accent-primary); text-decoration:none; font-weight:600;">[Inspect Frame ${esc(t.evidence_frame)}]</a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        
+        html += `
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 2rem;">
+                <h3 style="margin-bottom: 1rem;">Forensic Trace Metadata</h3>
+                <pre style="background:var(--surface-raised); border:1px solid var(--border-default); padding:1rem; border-radius:2px; font-family:var(--font-mono); font-size:var(--text-xs); overflow-x:auto;">
+${esc(JSON.stringify({
+    evidence_integrity: report.evidence_integrity || {},
+    detected_entities: {
+        persons: (report.persons_identified || []).length,
+        objects: (report.weapons_objects || []).length
+    }
+}, null, 2))}
+                </pre>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        container.style.padding = '2rem';
+        container.style.maxWidth = '900px';
+        container.style.margin = '0 auto';
+    };
+    
+    window.__jumpToInvestigation = (index) => {
+        window.__switchViewMode('investigation');
+        window.__openTimelineEvent(index);
+    };
+    
+    window.__exportReportJson = () => {
+        if (!AppState.report) return;
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(AppState.report, null, 2));
+        const dlAnchorElem = document.createElement('a');
+        dlAnchorElem.setAttribute("href", dataStr);
+        dlAnchorElem.setAttribute("download", `alfa_hawk_${AppState.report.metadata?.analysis_id || 'report'}.json`);
+        document.body.appendChild(dlAnchorElem);
+        dlAnchorElem.click();
+        dlAnchorElem.remove();
+    };
 
     function switchTab(tabId) {
-        activeTab = tabId;
+        /* activeTab tracked by DOM .active class */
         tabBtns.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId));
         tabContents.forEach(content => content.classList.toggle('active', content.id === `tab-${tabId}`));
     }
@@ -574,13 +740,18 @@
         let foundActive = false;
         steps.forEach(s => {
             const id = s.getAttribute('data-step');
+            const pctEl = s.querySelector('.f-step-pct');
+            
             if (id === activeStepId) {
                 s.className = 'f-step active';
                 foundActive = true;
+                if (pctEl) pctEl.textContent = `${Math.round(percent)}%`;
             } else if (!foundActive) {
                 s.className = 'f-step done';
+                if (pctEl) pctEl.textContent = '100%';
             } else {
                 s.className = 'f-step';
+                if (pctEl) pctEl.textContent = '0%';
             }
         });
     }
@@ -591,7 +762,11 @@
     }
 
     function resetProgressSteps() {
-        $$('.f-step').forEach(s => s.className = 'f-step');
+        $$('.f-step').forEach(s => {
+            s.className = 'f-step';
+            const pctEl = s.querySelector('.f-step-pct');
+            if (pctEl) pctEl.textContent = '';
+        });
         $('#progress-fill').style.width = '0%';
     }
 
@@ -602,7 +777,7 @@
     function resetAll() {
         clearInterval(pollTimer);
         currentSessionId = null;
-        currentReport = null;
+        updateState({ report: null, activeEventIndex: -1 });
         resetFileSelection();
         showSection('initial');
     }
@@ -646,8 +821,8 @@
     }
 
     function downloadJson() {
-        if (!currentReport) return;
-        const blob = new Blob([JSON.stringify(currentReport, null, 2)], { type: 'application/json' });
+        if (!AppState.report) return;
+        const blob = new Blob([JSON.stringify(AppState.report, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -656,100 +831,83 @@
     }
 
     // ═══════════════════════════════════════════════════
-    // LIGHTBOX & HELPERS
+    // NAVIGATION HELPERS
     // ═══════════════════════════════════════════════════
-    function openLightbox(src, caption, timestamp, meta = {}) {
-        $('#lightbox-img').src = src;
-        $('#lightbox-caption').textContent = caption;
-        $('#lightbox-timestamp').textContent = timestamp || '';
-        $('#lightbox-frame-id').textContent = meta.frameId || 'FRAME --';
-        $('#lightbox-linked-event').textContent = meta.linkedEvent || 'No linked event';
-
-        const jumpButton = $('#lightbox-jump-link');
-        currentFrameContext = meta;
-        if (meta.timelineIndex !== undefined && meta.timelineIndex !== null) {
-            jumpButton.style.display = 'inline-flex';
+    window.__openEvidenceFrame = (frameId) => {
+        if (!AppState.report || !frameId || frameId === 'N/A') return;
+        
+        // Find if this frame is explicitly linked to an event in the timeline
+        const timelineIdx = (AppState.report.timeline || []).findIndex(
+            item => item.evidence_frame === frameId || item.evidence_frame_ref === frameId
+        );
+        
+        if (timelineIdx >= 0) {
+            updateState({ activeEventIndex: timelineIdx });
         } else {
-            jumpButton.style.display = 'none';
-        }
-        $('#lightbox').style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-    }
-
-    function closeLightbox() {
-        $('#lightbox').style.display = 'none';
-        document.body.style.overflow = '';
-        currentFrameContext = null;
-    }
-
-    window.__openLightbox = openLightbox;
-    
-    window.__openEvidenceFrame = (frameId, options = {}) => {
-        if (!currentReport || !frameId || frameId === 'N/A') return;
-        const frame = findFrameById(frameId);
-        if (frame && frame.base64) {
-            openLightbox(
-                `data:image/jpeg;base64,${frame.base64}`,
-                frame.description || 'No AI observation available.',
-                frame.timestamp,
-                {
-                    frameId: frame.frame_id || frameId,
-                    linkedEvent: options.linkedEvent || 'Direct evidence access',
-                    timelineIndex: options.timelineIndex ?? null,
-                }
-            );
-        } else {
-            console.warn('Frame not found in exhibits:', frameId);
+            // Technically a frame could exist without an event, but Phase 3 
+            // drives everything through activeEventIndex. If it's isolated,
+            // we could either create a fake event context or just warn.
+            console.warn('Frame has no direct timeline event association. Isolated viewing not supported in Phase 3 layout yet.');
         }
     };
 
     window.__openTimelineEvent = (index) => {
-        if (!currentReport) return;
-        const timeline = currentReport.timeline || [];
-        const event = timeline[index];
-        if (!event) return;
-
-        const frame = findFrameById(event.evidence_frame);
-        const observation = frame?.description || event.event || 'No AI observation available.';
-        const timeStr = event.time || frame?.timestamp || '--';
-        const totalSecs = timeToSeconds(timeStr);
-        const duration = currentReport.evidence_integrity?.duration_seconds || 10;
-        const percent = Math.min(100, duration ? (totalSecs / duration) * 100 : 0);
-
-        updateScrubberPosition(percent);
-        window.__openEvidenceFrame(event.evidence_frame, {
-            timelineIndex: index,
-            linkedEvent: `${timeStr} - ${event.event || 'Timeline event'}`,
-        });
-        const node = document.getElementById(`timeline-event-${index}`);
-        if (node) {
-            document.querySelectorAll('.timeline-item.active').forEach((item) => item.classList.remove('active'));
-            node.classList.add('active');
+        if (!AppState.report) return;
+        const timeline = AppState.report.timeline || [];
+        if (index >= 0 && index < timeline.length) {
+            updateState({ activeEventIndex: index });
         }
     };
-
-    window.__openPersonDetails = (personId) => {
-        const person = (currentReport?.persons_identified || []).find(p => p.person_id === personId);
-        if (person) {
-            // Persons tab doesn't have a detail panel, so we just open their primary evidence frame
-            window.__openEvidenceFrame(person.evidence_frame);
-        }
-    };
-
-    $('#lightbox-jump-link').addEventListener('click', () => {
-        if (!currentFrameContext || currentFrameContext.timelineIndex === undefined || currentFrameContext.timelineIndex === null) return;
-        const timelineIndex = currentFrameContext.timelineIndex;
-        switchTab('timeline');
-        closeLightbox();
-        setTimeout(() => {
-            const node = document.getElementById(`timeline-event-${timelineIndex}`);
-            if (node) {
-                node.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                node.classList.add('pulse-focus');
-                setTimeout(() => node.classList.remove('pulse-focus'), 1200);
+    
+    function setupFrameZoomPan() {
+        const fvImage = $('#fv-image');
+        if (!fvImage) return;
+        let isZoomed = false;
+        
+        fvImage.addEventListener('click', (e) => {
+            isZoomed = !isZoomed;
+            if (isZoomed) {
+                fvImage.style.cursor = 'zoom-out';
+                fvImage.style.transform = 'scale(2.5)';
+                updatePan(e);
+            } else {
+                fvImage.style.cursor = 'zoom-in';
+                fvImage.style.transform = 'none';
+                fvImage.style.transformOrigin = 'center center';
             }
-        }, 50);
-    });
+        });
+        
+        fvImage.addEventListener('mousemove', (e) => {
+            if (!isZoomed) return;
+            updatePan(e);
+        });
+        
+        fvImage.addEventListener('mouseleave', () => {
+            if (isZoomed) {
+                isZoomed = false;
+                fvImage.style.cursor = 'zoom-in';
+                fvImage.style.transform = 'none';
+                fvImage.style.transformOrigin = 'center center';
+            }
+        });
+        
+        function updatePan(e) {
+            const rect = fvImage.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            fvImage.style.transformOrigin = `${x}% ${y}%`;
+        }
+        
+        // Reset zoom on state change
+        document.addEventListener('StateChanged', () => {
+            if (isZoomed) {
+                isZoomed = false;
+                fvImage.style.cursor = 'zoom-in';
+                fvImage.style.transform = 'none';
+                fvImage.style.transformOrigin = 'center center';
+            }
+        });
+    }
 
     function esc(str) {
         if (!str) return '';
@@ -769,7 +927,7 @@
     }
 
     function findFrameById(frameId) {
-        return (currentReport?.evidence_exhibits || []).find(
+        return (AppState.report?.evidence_exhibits || []).find(
             (f) => f.frame_id === frameId || f.frame_ref === frameId
         );
     }
@@ -817,81 +975,7 @@
         return [...new Set(detectedSubjects.map(subject => String(subject).toUpperCase()))];
     }
 
-    function derivePhaseTitle(phase, index) {
-        if (phase.title) return phase.title;
-        if (phase.name) return phase.name;
-        const description = phase.description || '';
-        const firstChunk = description.split(/[.:-]/)[0].trim();
-        return firstChunk || `Phase ${phase.phase || index + 1}`;
-    }
 
-    function renderEvidenceMiniFrame(frameId, contextLabel, meta = {}) {
-        const frame = findFrameById(frameId);
-        return `
-            <button class="mini-frame-card" type="button" onclick="event.stopPropagation(); window.__openEvidenceFrame('${esc(frameId || '')}', ${JSON.stringify(meta).replace(/"/g, '&quot;')});">
-                <div class="mini-frame-thumb">
-                    ${frame?.base64 ? `<img src="data:image/jpeg;base64,${frame.base64}" alt="${esc(frameId || 'Evidence frame')}" loading="lazy" decoding="async">` : '<div class="mini-frame-fallback">NO IMAGE</div>'}
-                </div>
-                <div class="mini-frame-details">
-                    <span class="mini-frame-label">${esc(contextLabel)}</span>
-                    <span class="mini-frame-id mono-tech">${esc(getFrameDisplayId(frame, frameId || 'N/A'))}</span>
-                </div>
-            </button>
-        `;
-    }
-
-    function buildPhaseCards(report) {
-        const phases = report.incident_phases || [];
-        if (!phases.length) {
-            return '<p class="text-muted">No phase reconstruction available.</p>';
-        }
-
-        return phases.map((phase, index) => {
-            const subjects = inferSubjectsFromEntry(phase, report);
-            const title = derivePhaseTitle(phase, index);
-            const linkedFrame = phase.evidence_frame || 'N/A';
-            const linkedTimelineIndex = findTimelineIndexByFrame(linkedFrame, report);
-            const frameMeta = {
-                linkedEvent: `Phase ${phase.phase || index + 1} reconstruction`,
-                timelineIndex: linkedTimelineIndex >= 0 ? linkedTimelineIndex : null,
-            };
-
-            return `
-                <article class="phase-card" onclick="window.__openEvidenceFrame('${esc(linkedFrame)}', ${JSON.stringify(frameMeta).replace(/"/g, '&quot;')})">
-                    <div class="phase-card-topline">
-                        <span class="phase-index mono-tech">PHASE ${esc(phase.phase || index + 1)}</span>
-                        <span class="phase-time mono-tech">${esc(phase.time_range || 'Time range unavailable')}</span>
-                    </div>
-                    <h4>${esc(title)}</h4>
-                    <div class="phase-card-grid">
-                        <div class="phase-metric">
-                            <span class="phase-metric-label">Subjects</span>
-                            <div class="phase-chip-row">
-                                ${subjects.length ? subjects.map(subject => `<span class="subject-chip">${esc(subject)}</span>`).join('') : '<span class="subject-chip subject-chip-muted">Unknown</span>'}
-                            </div>
-                        </div>
-                        <div class="phase-metric">
-                            <span class="phase-metric-label">Evidence Frames</span>
-                            <div class="phase-evidence-row">
-                                ${renderEvidenceMiniFrame(linkedFrame, 'Primary frame', frameMeta)}
-                            </div>
-                        </div>
-                    </div>
-                    <p class="phase-brief">${esc(phase.description || 'No brief description available.')}</p>
-                </article>
-            `;
-        }).join('');
-    }
-
-    function findTimelineIndexByFrame(frameId, report) {
-        return (report?.timeline || []).findIndex(item => item.evidence_frame === frameId);
-    }
-
-    function updateScrubberPosition(percent) {
-        const safePercent = `${Math.max(0, Math.min(100, percent))}%`;
-        $('#scrubber-progress').style.width = safePercent;
-        $('#scrubber-handle').style.left = safePercent;
-    }
 
     // START
     init();

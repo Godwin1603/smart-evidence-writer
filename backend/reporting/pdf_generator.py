@@ -153,8 +153,8 @@ def generate_pdf(report):
 
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
-        topMargin=20 * mm, bottomMargin=25 * mm,
-        leftMargin=20 * mm, rightMargin=20 * mm,
+        topMargin=28 * mm, bottomMargin=30 * mm,
+        leftMargin=22 * mm, rightMargin=22 * mm,
         title=report.get('header', {}).get('report_title', 'Evidence Report'),
         author='Alfa Hawk — AI Forensic Evidence Report Generator | Alfa Labs, a child company of Alfa Groups'
     )
@@ -167,59 +167,68 @@ def generate_pdf(report):
         section_num += 1
         return section_num
 
+    # ============================================================
+    # SECTION ORDER (forensic standard):
+    #   Cover → Case Info → Evidence Metadata → Evidence Integrity
+    #   → Technical Analysis → Source Warnings → Scene Description
+    #   → Executive Summary → Observations
+    #   → Incident Reconstruction → Timeline
+    #   → Persons → Objects/Weapons → Vehicles
+    #   → Legal Classification → Risk Assessment
+    #   → Violations → Accidents → Recommendations
+    #   → AI Confidence → AI Limitations → AI Disclosure
+    #   → Chain of Processing → Appendices → Certification
+    # ============================================================
+
     # === COVER / HEADER ===
     elements.extend(_build_pdf_header(report, styles))
     elements.append(Spacer(1, 8))
 
-    # === CASE INFORMATION TABLE ===
+    # === 1. CASE INFORMATION ===
     elements.extend(_build_case_info_table(report, styles))
     elements.append(Spacer(1, 10))
 
-    # === EVIDENCE DESCRIPTION ===
+    # === 2. EVIDENCE METADATA ===
     elements.extend(_build_evidence_section(report, styles))
     elements.append(Spacer(1, 6))
 
-    # === 1. EXECUTIVE SUMMARY ===
-    elements.append(_section_divider())
-    n = next_section()
-    elements.append(Paragraph(f'{n}. EXECUTIVE SUMMARY', styles['SectionHeader']))
-    elements.append(Paragraph(
-        _safe_text(report.get('executive_summary', 'No summary available.')),
-        styles['BodyText']
-    ))
-
-    # === 2. KEY EVIDENCE OBSERVATIONS (V2.1) ===
-    observations = report.get('key_evidence_observations', [])
-    if observations:
-        elements.append(Paragraph('KEY EVIDENCE OBSERVATIONS', styles['SubSectionHeader']))
-        for obs in observations:
-            elements.append(Paragraph(f'\u2022 {_safe_text(obs)}', styles['BodyText']))
-        elements.append(Spacer(1, 6))
-
-    # === 3. EVIDENCE INTEGRITY (V2) ===
+    # === 3. EVIDENCE INTEGRITY / HASH VERIFICATION ===
     integrity = report.get('evidence_integrity', {})
     if integrity:
         n = next_section()
         elements.append(_section_divider())
-        elements.append(Paragraph(f'{n}. EVIDENCE INTEGRITY', styles['SectionHeader']))
+        elements.append(Paragraph(f'{n}. EVIDENCE INTEGRITY / HASH VERIFICATION', styles['SectionHeader']))
         elements.extend(_build_integrity_pdf(integrity, styles))
 
-    # === 4. VIDEO QUALITY ASSESSMENT (V2.1) ===
+    # === 4. TECHNICAL MEDIA ANALYSIS ===
     quality = report.get('video_quality_assessment', {})
     if quality:
         n = next_section()
-        elements.append(Paragraph(f'{n}. VIDEO QUALITY ASSESSMENT', styles['SectionHeader']))
+        elements.append(_section_divider())
+        elements.append(Paragraph(f'{n}. TECHNICAL MEDIA ANALYSIS', styles['SectionHeader']))
         elements.extend(_build_video_quality_pdf(quality, styles))
+
+    # === SOURCE WARNINGS (broadcast detection) ===
+    source_warnings = report.get('source_warnings', [])
+    if source_warnings:
+        elements.append(_section_divider())
+        elements.append(Paragraph('\u26a0 EVIDENCE SOURCE WARNING', styles['SectionHeader']))
+        for warning in source_warnings:
+            elements.append(Paragraph(
+                _safe_text(warning.get('message', '')),
+                styles['AlertText']
+            ))
+        elements.append(Spacer(1, 6))
 
     # === 5. SCENE DESCRIPTION ===
     if report.get('scene_description'):
         n = next_section()
+        elements.append(_section_divider())
         elements.append(Paragraph(f'{n}. SCENE DESCRIPTION', styles['SectionHeader']))
         scene = report['scene_description']
         env = scene.get('environment', '') if isinstance(scene, dict) else scene
         elements.append(Paragraph(_safe_text(env), styles['BodyText']))
-        
-        # Camera Context
+
         if isinstance(scene, dict) and scene.get('camera_context'):
             elements.append(Paragraph('Camera Perspective:', styles['SubSectionHeader']))
             cc = scene['camera_context']
@@ -228,7 +237,23 @@ def generate_pdf(report):
             cc_text += f"<b>Limitations:</b> {cc.get('visibility_limitations', 'N/A')}"
             elements.append(Paragraph(cc_text, styles['BodyText']))
 
-    # === 4. INCIDENT RECONSTRUCTION (V2) ===
+    # === 6. EXECUTIVE SUMMARY & OBSERVATIONS ===
+    elements.append(_section_divider())
+    n = next_section()
+    elements.append(Paragraph(f'{n}. EXECUTIVE SUMMARY', styles['SectionHeader']))
+    elements.append(Paragraph(
+        _safe_text(report.get('executive_summary', 'No summary available.')),
+        styles['BodyText']
+    ))
+
+    observations = report.get('key_evidence_observations', [])
+    if observations:
+        elements.append(Paragraph('KEY EVIDENCE OBSERVATIONS', styles['SubSectionHeader']))
+        for obs in observations:
+            elements.append(Paragraph(f'\u2022 {_safe_text(obs)}', styles['BodyText']))
+        elements.append(Spacer(1, 6))
+
+    # === 7. INCIDENT RECONSTRUCTION ===
     phases = report.get('incident_phases', [])
     if phases:
         n = next_section()
@@ -236,7 +261,15 @@ def generate_pdf(report):
         elements.append(Paragraph(f'{n}. INCIDENT RECONSTRUCTION', styles['SectionHeader']))
         elements.extend(_build_phases_pdf(phases, styles))
 
-    # === 5. PERSONS OF INTEREST (V2) ===
+    # === 8. CHRONOLOGICAL TIMELINE ===
+    timeline = report.get('timeline', [])
+    if timeline:
+        n = next_section()
+        elements.append(_section_divider())
+        elements.append(Paragraph(f'{n}. CHRONOLOGICAL TIMELINE', styles['SectionHeader']))
+        elements.extend(_build_timeline_pdf(timeline, styles))
+
+    # === 9. PERSONS OF INTEREST ===
     persons = report.get('persons_identified', [])
     if persons:
         n = next_section()
@@ -244,44 +277,13 @@ def generate_pdf(report):
         elements.append(Paragraph(f'{n}. PERSONS OF INTEREST', styles['SectionHeader']))
         elements.extend(_build_persons_v2_pdf(persons, styles))
 
-    # === 6. WEAPONS & OBJECTS (V2) ===
+    # === 10. OBJECTS & WEAPONS DETECTED ===
     weapons = report.get('weapons_objects', [])
     if weapons:
         n = next_section()
         elements.append(_section_divider())
-        elements.append(Paragraph(f'{n}. WEAPONS &amp; OBJECTS DETECTED', styles['SectionHeader']))
+        elements.append(Paragraph(f'{n}. OBJECTS \u0026amp; WEAPONS DETECTED', styles['SectionHeader']))
         elements.extend(_build_weapons_pdf(weapons, styles))
-
-    # === 7. LEGAL CLASSIFICATION (V2) ===
-    legal = report.get('legal_classification', {})
-    if legal and legal.get('classifications'):
-        n = next_section()
-        elements.append(_section_divider())
-        elements.append(Paragraph(f'{n}. LEGAL CLASSIFICATION (INDICATIVE)', styles['SectionHeader']))
-        elements.extend(_build_legal_pdf(legal, styles))
-
-    # === 8. VIOLATIONS ===
-    violations = report.get('violations', [])
-    if violations:
-        n = next_section()
-        elements.append(_section_divider())
-        elements.append(Paragraph(f'{n}. VIOLATIONS DETECTED', styles['SectionHeader']))
-        elements.extend(_build_violations_pdf(violations, styles))
-
-    # === 9. ACCIDENTS ===
-    accidents = report.get('accidents', [])
-    if accidents:
-        n = next_section()
-        elements.append(_section_divider())
-        elements.append(Paragraph(f'{n}. ACCIDENT ANALYSIS', styles['SectionHeader']))
-        elements.extend(_build_accidents_pdf(accidents, styles))
-
-    # === 10. CHRONOLOGICAL TIMELINE ===
-    timeline = report.get('timeline', [])
-    if timeline:
-        n = next_section()
-        elements.append(Paragraph(f'{n}. CHRONOLOGICAL TIMELINE', styles['SectionHeader']))
-        elements.extend(_build_timeline_pdf(timeline, styles))
 
     # === 11. VEHICLE REGISTRY ===
     vehicles = report.get('vehicle_registry', [])
@@ -291,7 +293,15 @@ def generate_pdf(report):
         elements.append(Paragraph(f'{n}. VEHICLE / NUMBER PLATE REGISTRY', styles['SectionHeader']))
         elements.extend(_build_vehicles_pdf(vehicles, styles))
 
-    # === 12. RISK ASSESSMENT ===
+    # === 12. LEGAL CLASSIFICATION ===
+    legal = report.get('legal_classification', {})
+    if legal and legal.get('classifications'):
+        n = next_section()
+        elements.append(_section_divider())
+        elements.append(Paragraph(f'{n}. LEGAL CLASSIFICATION (INDICATIVE)', styles['SectionHeader']))
+        elements.extend(_build_legal_pdf(legal, styles))
+
+    # === 13. RISK & THREAT ASSESSMENT ===
     risk = report.get('risk_assessment', {})
     if risk and risk.get('threat_level'):
         n = next_section()
@@ -299,15 +309,32 @@ def generate_pdf(report):
         elements.append(Paragraph(f'{n}. RISK &amp; THREAT ASSESSMENT', styles['SectionHeader']))
         elements.extend(_build_risk_pdf(risk, styles))
 
-    # === 13. RECOMMENDATIONS ===
+    # === 14. VIOLATIONS ===
+    violations = report.get('violations', [])
+    if violations:
+        n = next_section()
+        elements.append(_section_divider())
+        elements.append(Paragraph(f'{n}. VIOLATIONS DETECTED', styles['SectionHeader']))
+        elements.extend(_build_violations_pdf(violations, styles))
+
+    # === 15. ACCIDENTS ===
+    accidents = report.get('accidents', [])
+    if accidents:
+        n = next_section()
+        elements.append(_section_divider())
+        elements.append(Paragraph(f'{n}. ACCIDENT ANALYSIS', styles['SectionHeader']))
+        elements.extend(_build_accidents_pdf(accidents, styles))
+
+    # === 16. INVESTIGATIVE LEADS ===
     recs = report.get('investigative_recommendations', [])
     if recs:
         n = next_section()
+        elements.append(_section_divider())
         elements.append(Paragraph(f'{n}. INVESTIGATIVE LEADS', styles['SectionHeader']))
         for i, rec in enumerate(recs):
             elements.append(Paragraph(f'{i + 1}. {_safe_text(rec)}', styles['BodyText']))
 
-    # === 14. AI CONFIDENCE MATRIX (V2) ===
+    # === 17. AI CONFIDENCE MATRIX ===
     conf_matrix = report.get('confidence_matrix', {})
     if conf_matrix:
         n = next_section()
@@ -315,15 +342,16 @@ def generate_pdf(report):
         elements.append(Paragraph(f'{n}. AI CONFIDENCE MATRIX', styles['SectionHeader']))
         elements.extend(_build_confidence_matrix_pdf(conf_matrix, styles))
 
-    # === 15. AI LIMITATIONS (V2) ===
+    # === 18. AI LIMITATIONS ===
     limitations = report.get('ai_limitations', [])
     if limitations:
         n = next_section()
+        elements.append(_section_divider())
         elements.append(Paragraph(f'{n}. AI ANALYSIS LIMITATIONS', styles['SectionHeader']))
         for lim in limitations:
             elements.append(Paragraph(f'\u2022 {_safe_text(lim)}', styles['BodyText']))
 
-    # === 16. AI PROCESSING DISCLOSURE (V2) ===
+    # === 19. AI PROCESSING DISCLOSURE ===
     disclosure = report.get('ai_processing_disclosure', '')
     if disclosure:
         n = next_section()
@@ -331,21 +359,22 @@ def generate_pdf(report):
         elements.append(Paragraph(f'{n}. AI PROCESSING DISCLOSURE', styles['SectionHeader']))
         elements.append(Paragraph(_safe_text(disclosure), styles['BodyText']))
 
-    # === 17. CHAIN OF PROCESSING (V2) ===
+    # === 20. CHAIN OF PROCESSING ===
     chain = report.get('chain_of_processing', {})
     if chain:
         n = next_section()
+        elements.append(_section_divider())
         elements.append(Paragraph(f'{n}. EVIDENCE HANDLING &amp; CHAIN OF PROCESSING', styles['SectionHeader']))
         elements.extend(_build_chain_pdf(chain, styles))
 
-    # === EVIDENCE EXHIBITS ===
+    # === APPENDIX A: EVIDENCE EXHIBITS ===
     exhibits = report.get('evidence_exhibits', [])
     if exhibits:
         elements.append(PageBreak())
         elements.append(Paragraph('APPENDIX A: EVIDENCE EXHIBITS', styles['SectionHeader']))
         elements.extend(_build_exhibits_pdf(exhibits, styles))
 
-    # === EVIDENCE FRAME INDEX (V2) ===
+    # === APPENDIX B: EVIDENCE FRAME INDEX ===
     frame_index = report.get('evidence_frame_index', [])
     if frame_index:
         elements.append(Paragraph('APPENDIX B: EVIDENCE FRAME INDEX', styles['SubSectionHeader']))
@@ -411,15 +440,15 @@ def _build_pdf_header(report, styles):
 def _build_case_info_table(report, styles):
     header = report.get('header', {})
     elements = []
+    # FIX #2: Removed 'Case Description' from table to prevent duplication
     data = [
         ['Case Number:', header.get('case_number', 'N/A'),
          'Report ID:', header.get('report_id', 'N/A')],
         ['Date:', header.get('date', 'N/A'),
          'Time:', header.get('time', 'N/A')],
         ['Officer ID:', header.get('officer_id', 'N/A'),
-         'Case Description:', ''],
+         '', ''],
     ]
-    case_desc = header.get('case_description', 'N/A')
     table = Table(data, colWidths=[80, 150, 80, 150])
     table.setStyle(TableStyle([
         ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
@@ -439,9 +468,14 @@ def _build_case_info_table(report, styles):
         ('LEFTPADDING', (0, 0), (-1, -1), 6),
     ]))
     elements.append(table)
-    if case_desc and case_desc != 'N/A':
+    # Case description appears ONCE, below the table
+    case_desc = header.get('case_description', '')
+    if case_desc and case_desc != 'N/A' and case_desc != 'Not Provided':
         elements.append(Spacer(1, 4))
         elements.append(Paragraph(f'<b>Case Description:</b> {_safe_text(case_desc)}', styles['SmallText']))
+    elif case_desc in ('Not Provided', '', 'N/A'):
+        elements.append(Spacer(1, 4))
+        elements.append(Paragraph('<b>Case Description:</b> \u2014', styles['SmallText']))
     return elements
 
 
@@ -603,24 +637,41 @@ def _build_risk_pdf(risk, styles):
 
 
 def _build_exhibits_pdf(exhibits, styles):
+    """Build evidence exhibits gallery with structured layout."""
+    MAX_NON_KEY_EXHIBITS = 6  # FIX #8: Limit to reduce report length
     elements = []
     key_findings = [e for e in exhibits if e.get('is_key_finding')]
     other_frames = [e for e in exhibits if not e.get('is_key_finding')]
+
     if key_findings:
         elements.append(Paragraph('Key Finding Frames', styles['SubSectionHeader']))
         for exhibit in key_findings:
-            elements.extend(_embed_frame_image(
-                exhibit.get('base64', ''),
-                f'[KEY] {exhibit.get("timestamp", "")} \u2014 {exhibit.get("description", "")}',
-                styles, max_width=4 * inch
-            ))
+            frame_block = []
+            img = _get_rl_image(exhibit.get('base64', ''), max_width=4 * inch)
+            if img:
+                frame_block.append(img)
+            # FIX #7: Structured frame info below each image
+            frame_ref = exhibit.get('frame_ref', '')
+            timestamp = exhibit.get('timestamp', '')
+            description = exhibit.get('description', '')
+            caption = f'[KEY] {frame_ref} \u2014 {timestamp}'
+            if description:
+                caption += f' \u2014 {description[:80]}'
+            frame_block.append(Paragraph(_safe_text(caption), styles['CaptionText']))
+            frame_block.append(Spacer(1, 8))
+            elements.append(KeepTogether(frame_block))
+
     if other_frames:
+        truncated = len(other_frames) > MAX_NON_KEY_EXHIBITS
+        display_frames = other_frames[:MAX_NON_KEY_EXHIBITS]
         elements.append(Paragraph('Additional Evidence Frames', styles['SubSectionHeader']))
         row = []
-        for exhibit in other_frames:
+        for exhibit in display_frames:
             img = _get_rl_image(exhibit.get('base64', ''), max_width=2.8 * inch)
             if img:
-                caption = Paragraph(f'{exhibit.get("timestamp", "")}', styles['CaptionText'])
+                frame_ref = exhibit.get('frame_ref', '')
+                timestamp = exhibit.get('timestamp', '')
+                caption = Paragraph(f'{frame_ref} \u2014 {timestamp}', styles['CaptionText'])
                 row.append([img, caption])
             if len(row) == 2:
                 table_data = [[row[0][0], row[1][0]], [row[0][1], row[1][1]]]
@@ -636,6 +687,13 @@ def _build_exhibits_pdf(exhibits, styles):
         if row:
             elements.append(row[0][0])
             elements.append(row[0][1])
+        if truncated:
+            elements.append(Spacer(1, 6))
+            elements.append(Paragraph(
+                f'Note: {len(other_frames) - MAX_NON_KEY_EXHIBITS} additional frames omitted. '
+                'See Frame Index table for complete reference.',
+                styles['SmallText']
+            ))
     return elements
 
 
@@ -796,13 +854,13 @@ def _build_persons_v2_pdf(persons, styles):
         data.append([
             _safe_text(p.get('person_id', '')),
             Paragraph(_safe_text(p.get('description', ''))[:80], styles['SmallText']),
-            _safe_text(p.get('observed_role', p.get('role', 'Unknown'))),
-            _safe_text(p.get('visibility_confidence', 'N/A')),
+            Paragraph(_safe_text(p.get('observed_role', p.get('role', 'Unknown'))), styles['SmallText']),
+            Paragraph(_safe_text(p.get('visibility_confidence', 'N/A')), styles['SmallText']),
             _safe_text(p.get('first_seen', 'N/A')),
             Paragraph(_safe_text(actions_str)[:70], styles['SmallText']),
         ])
     if len(data) > 1:
-        table = Table(data, colWidths=[35, 120, 75, 55, 60, 115])
+        table = Table(data, colWidths=[30, 110, 85, 65, 60, 110])
         table.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 8),
@@ -826,43 +884,83 @@ def _build_persons_v2_pdf(persons, styles):
 
 
 def _build_weapons_pdf(weapons, styles):
-    """Build weapons/objects detection table."""
-    elements = []
-    data = [['#', 'Object', 'Timestamp', 'Confidence', 'Held By', 'Evidence Ref']]
-    for w in weapons:
-        conf_level = w.get('confidence_level', 'medium').capitalize()
-        conf_percent = w.get('confidence_percent', 75)
-        data.append([
-            str(w.get('index', '')),
-            Paragraph(_safe_text(w.get('object', '')), styles['SmallText']),
-            _safe_text(w.get('timestamp', 'N/A')),
-            f'{conf_level} ({conf_percent}%)',
-            _safe_text(w.get('held_by', 'N/A') if isinstance(w.get('held_by'), str) else 'N/A'),
-            _safe_text(w.get('frame_ref', 'N/A')),
-        ])
-    if len(data) > 1:
-        table = Table(data, colWidths=[20, 160, 65, 80, 75, 65])
-        table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('BACKGROUND', (0, 0), (-1, 0), HexColor('#7f1d1d')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
-            ('GRID', (0, 0), (-1, -1), 0.5, BORDER_COLOR),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [WHITE, HexColor('#fef2f2')]),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ]))
-        elements.append(table)
+    """Build objects & weapons table with category sub-sections.
 
-    # Descriptions below
-    for w in weapons:
-        if w.get('description'):
-            elements.append(Paragraph(
-                f'<b>{_safe_text(w.get("object", ""))}:</b> {_safe_text(w["description"])}',
-                styles['SmallText']
-            ))
+    FIX #4: Objects are now grouped by category:
+    - Potential Weapons (weapons + suspicious)
+    - Environmental / Scene Objects (environmental)
+    """
+    elements = []
+
+    # Split by category
+    weapon_items = [w for w in weapons if w.get('category') in ('weapon', 'suspicious')]
+    env_items = [w for w in weapons if w.get('category') == 'environmental']
+    none_items = [w for w in weapons if w.get('category') == 'none']
+
+    if none_items:
+        # "None detected" placeholder
+        elements.append(Paragraph(
+            _safe_text(none_items[0].get('description', 'No weapons detected.')),
+            styles['BodyText']
+        ))
+        return elements
+
+    def _weapons_table(items, header_bg):
+        data = [['#', 'Object', 'Category', 'Timestamp', 'Confidence', 'Ref']]
+        for w in items:
+            conf_str = w.get('confidence_level', 'medium')
+            if isinstance(conf_str, str):
+                conf_str = conf_str.capitalize()
+            conf_percent = w.get('confidence_percent', 75)
+            cat_label = w.get('category', 'unknown').upper()
+            data.append([
+                str(w.get('index', '')),
+                Paragraph(_safe_text(w.get('object', '')), styles['SmallText']),
+                cat_label,
+                _safe_text(w.get('timestamp', 'N/A')),
+                f'{conf_str} ({conf_percent}%)',
+                _safe_text(w.get('frame_ref', 'N/A')),
+            ])
+        if len(data) > 1:
+            t = Table(data, colWidths=[20, 140, 70, 60, 80, 50])
+            t.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('BACKGROUND', (0, 0), (-1, 0), header_bg),
+                ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
+                ('GRID', (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [WHITE, HexColor('#fef2f2')]),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ]))
+            return t
+        return None
+
+    if weapon_items:
+        elements.append(Paragraph('Potential Weapons / Suspicious Objects', styles['SubSectionHeader']))
+        tbl = _weapons_table(weapon_items, HexColor('#7f1d1d'))
+        if tbl:
+            elements.append(tbl)
+        for w in weapon_items:
+            if w.get('description'):
+                elements.append(Paragraph(
+                    f'<b>{_safe_text(w.get("object", ""))}:</b> {_safe_text(w["description"])}',
+                    styles['SmallText']
+                ))
+        elements.append(Spacer(1, 6))
+
+    if env_items:
+        elements.append(Paragraph('Environmental / Scene Objects', styles['SubSectionHeader']))
+        tbl = _weapons_table(env_items, STEEL)
+        if tbl:
+            elements.append(tbl)
+        elements.append(Spacer(1, 4))
+
+    if not weapon_items and not env_items:
+        elements.append(Paragraph('No objects of interest detected.', styles['BodyText']))
+
     return elements
 
 
@@ -906,18 +1004,24 @@ def _build_legal_pdf(legal, styles):
 
 
 def _build_confidence_matrix_pdf(matrix, styles):
-    """Build AI confidence matrix table."""
+    """Build AI confidence matrix table — FIX #5: No contradictory UNKNOWN + percentage."""
     elements = []
     data = [['Detection Type', 'Confidence Level', 'System Estimate']]
     for detection_type, conf_data in matrix.items():
         label = conf_data.get('label', 'Unknown')
-        percent = conf_data.get('percent', 75)
-        
-        level_color = GREEN if percent >= 85 else (AMBER if percent >= 70 else RED_ALERT)
+        percent = conf_data.get('percent')  # May be None
+
+        level_color = GREEN if (percent or 0) >= 85 else (AMBER if (percent or 0) >= 70 else RED_ALERT)
+        if label.lower() == 'unknown' or percent is None:
+            level_color = STEEL
+
+        # Display: If percent is None, show "—" instead of a number
+        percent_display = f'{percent}%' if percent is not None else '\u2014'
+
         data.append([
             _safe_text(detection_type.replace('_', ' ').title()),
             Paragraph(f'<font color="{level_color.hexval()}">{label.upper()}</font>', styles['SmallText']),
-            f'{percent}%',
+            percent_display,
         ])
     if len(data) > 1:
         table = Table(data, colWidths=[200, 80, 80])
@@ -952,19 +1056,23 @@ def _build_chain_pdf(chain, styles):
 
 
 def _build_frame_index_pdf(frame_index, styles):
-    """Build evidence frame index table."""
+    """Build evidence frame index table with status column.
+
+    FIX #3: Adds 'Status' column to distinguish referenced vs additional frames.
+    """
     elements = []
-    data = [['Ref', 'Timestamp', 'Description', 'Findings']]
+    data = [['Ref', 'Timestamp', 'Status', 'Findings']]
     for f in frame_index:
         findings_str = '; '.join(f.get('findings', []))[:80] or '\u2014'
+        status = f.get('status', 'Additional extracted frame')
         data.append([
             f.get('frame_ref', ''),
             f.get('timestamp', ''),
-            _safe_text(f.get('description', ''))[:60] or '\u2014',
+            Paragraph(_safe_text(status), styles['SmallText']),
             Paragraph(_safe_text(findings_str), styles['SmallText']),
         ])
     if len(data) > 1:
-        table = Table(data, colWidths=[35, 70, 180, 175])
+        table = Table(data, colWidths=[35, 65, 130, 200])
         table.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 8),
