@@ -20,7 +20,18 @@ Thumbs.db
 .env
 *.env
 backend/.env
-# Exclude credentials
+# Common environment files
+.env.local
+.env.production
+.env.production.local
+.env.staging
+.env.staging.local
+# Secret material
+secrets/
+*.key
+*.pem
+*.p12
+*.pfx
 credentials.json
 # Dependencies
 node_modules/
@@ -29,3 +40,5 @@ node_modules/
 dist/
 build/
 *.egg-info/
+
+.txt

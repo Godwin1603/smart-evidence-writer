@@ -1,0 +1,22 @@
+# Smart Evidence Writer — AI Evidence Analysis Platform
+
+
+# Smart Evidence Writer
+AI-Powered Evidence Analysis & Report Generation
+
+## 📁 Upload Evidence
+Upload image, video, or audio evidence for AI-powered forensic analysis
+Drag & drop your evidence file here
+or
+Supports: JPG, PNG, MP4, AVI, MP3, WAV • Max 100MB
+
+## ⏳ Analyzing Evidence
+Processing your file with AI analysis pipeline
+
+### Analysis Error
+
+## 📋 Evidence Analysis Report
+AI-generated structured forensic evidence report
+
+### 📸 Extracted Evidence Frames
+Smart Evidence Writer • AI-Powered Evidence Analysis • All data processed in-memory only • No files stored

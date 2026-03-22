@@ -1,0 +1,21 @@
+name: Deploy (Production)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy disabled by default
+        run: |
+          echo "Production deployment is intentionally not implemented in-repo."
+          echo "Configure your hosting provider (Render/Railway) to deploy production from the main branch only,"
+          echo "or add a deployment step here using provider tokens stored as GitHub Secrets."
+

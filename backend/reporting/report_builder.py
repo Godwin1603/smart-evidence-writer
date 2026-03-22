@@ -55,7 +55,16 @@ CONFIDENCE_LEVEL_MAP = {
     'low': 60,
     'medium': 75,
     'high': 90,
+    'very high': 95,
+    'unknown': 0,
 }
+
+# Broadcast overlay keywords for source detection
+_BROADCAST_KEYWORDS = [
+    'news', 'broadcast', 'ndtv', 'cnn', 'bbc', 'overlay', 'ticker',
+    'channel logo', 'breaking news', 'live', 'graphic overlay',
+    'watermark', 'station logo', 'news banner', 'chyron',
+]
 
 
 def build_forensic_report(raw_analysis, metadata, frames=None, case_data=None, engine_version="1.0"):
@@ -151,14 +160,24 @@ def build_forensic_report(raw_analysis, metadata, frames=None, case_data=None, e
         # ── Certification ──
         'certification': _build_certification(),
 
+        # ── V3: Broadcast / Source Warnings ──
+        'source_warnings': _detect_broadcast_source(raw_analysis),
+
         # ── Legacy fields ──
         'environmental_conditions': raw_analysis.get('environmental_conditions', {}),
         'forensic_observations': raw_analysis.get('forensic_observations', ''),
-        'confidence_score': raw_analysis.get('confidence_score', 0),
         'analysis_notes': raw_analysis.get('analysis_notes', ''),
         'engine_version': engine_version,
         'generated_at': datetime.now().isoformat(),
     }
+
+    # FIX #6: Compute confidence_score from the confidence matrix, not raw AI field
+    matrix = report.get('confidence_matrix', {})
+    if matrix:
+        valid_percents = [v['percent'] for v in matrix.values() if v.get('percent') is not None]
+        report['confidence_score'] = (sum(valid_percents) / len(valid_percents) / 100) if valid_percents else 0
+    else:
+        report['confidence_score'] = raw_analysis.get('confidence_score', 0)
 
     report['platform_verification'] = {
         'platform_name': PLATFORM_NAME,
@@ -267,11 +286,28 @@ def _build_detailed_analysis(analysis):
 
 
 def _annotate_frames(frames):
+    """Annotate frames with F-refs and deduplicate timestamps.
+
+    FIX #2: If two frames share the same formatted timestamp we
+    append a sub-index (e.g. 00:00:08a, 00:00:08b) so that the
+    frame index never shows identical times for different IDs.
+    """
     annotated = {}
+    seen_timestamps = {}  # timestamp_formatted -> count
     for i, (frame_id, frame_data) in enumerate(frames.items()):
         entry = dict(frame_data)
         entry['frame_id'] = frame_id
         entry['frame_ref'] = f'F{i + 1}'
+
+        ts = entry.get('timestamp_formatted', '00:00:00')
+        if ts in seen_timestamps:
+            seen_timestamps[ts] += 1
+            # Append disambiguator: 00:00:08 -> 00:00:08b, 00:00:08c, …
+            suffix = chr(ord('a') + seen_timestamps[ts])
+            entry['timestamp_formatted'] = f'{ts}{suffix}'
+        else:
+            seen_timestamps[ts] = 0
+
         annotated[frame_id] = entry
     return annotated
 
@@ -455,10 +491,13 @@ def _build_timeline(analysis, frames, frame_map=None):
         raw_time = e.get('time_indicator', e.get('time', ''))
         evidentiary_frame = _resolve_frame_reference(raw_frame, raw_time, frames, frame_map)
         matched_frame = frames.get(evidentiary_frame, {})
-        
+
+        # FIX #4: Use the frame's actual timestamp to prevent timeline/index mismatch
+        display_time = matched_frame.get('timestamp_formatted') or raw_time or f'Event {i + 1}'
+
         timeline.append({
             'sequence': i + 1,
-            'time': raw_time or matched_frame.get('timestamp_formatted', f'Event {i + 1}'),
+            'time': display_time,
             'event': e.get('event', e.get('description', 'No description')),
             'evidence_frame': evidentiary_frame,
             'evidence_frame_ref': matched_frame.get('frame_ref', raw_frame or 'N/A'),
@@ -592,11 +631,25 @@ def _build_incident_phases(phases, frames, frame_map=None):
 
 
 def _build_scene_description(scene):
-    """Handle object-based scene description."""
+    """Handle object-based scene description.
+
+    FIX #5: Adds confidence qualifier so descriptions avoid
+    definitive statements about location type unless the AI
+    expressed high confidence.
+    """
     if isinstance(scene, str):
         return {'environment': scene, 'camera_context': {}}
+    env_text = scene.get('environment', 'No environmental description available.')
+    # Inject qualifier if the text contains speculative language
+    _SPECULATIVE = ['possibly', 'appears to be', 'likely', 'may be', 'could be']
+    if any(word in env_text.lower() for word in _SPECULATIVE):
+        env_text = (
+            'Note: The following environmental observations are AI-generated '
+            'and may contain uncertainty. Investigator verification is required.\n\n'
+            + env_text
+        )
     return {
-        'environment': scene.get('environment', 'No environmental description available.'),
+        'environment': env_text,
         'camera_context': scene.get('camera_context', {})
     }
 
@@ -623,11 +676,23 @@ def _build_person_registry(persons, frames, frame_map=None):
         evidentiary_frame = _resolve_frame_reference(raw_frame, raw_time, frames, frame_map)
         matched_frame = frames.get(evidentiary_frame, {})
         
+        # FIX #3: Only replace exact role words, not substrings
+        raw_role = p.get('observed_role', p.get('role', p.get('relevance', 'unknown')))
+        if isinstance(raw_role, str):
+            role_lower = raw_role.strip().lower()
+            # Only do full-word replacements to avoid "possible possible victim"
+            if role_lower == 'suspect':
+                role_lower = 'possible aggressor'
+            elif role_lower == 'victim':
+                role_lower = 'possible victim'
+        else:
+            role_lower = 'unknown'
+
         entry = {
             'index': i + 1,
             'person_id': p.get('person_id', f'P{i + 1}'),
             'description': p.get('description', 'No description'),
-            'observed_role': p.get('observed_role', p.get('role', p.get('relevance', 'unknown'))).lower().replace('suspect', 'possible aggressor').replace('victim', 'possible victim'),
+            'observed_role': role_lower,
             'visibility_confidence': p.get('visibility_confidence', 'N/A'),
             'first_seen': raw_time or matched_frame.get('timestamp_formatted', 'N/A'),
             'evidence_frame': evidentiary_frame,
@@ -643,12 +708,39 @@ def _build_person_registry(persons, frames, frame_map=None):
     return enriched
 
 
+# Keywords that indicate an actual weapon or suspicious item
+_WEAPON_KEYWORDS = [
+    'gun', 'pistol', 'rifle', 'firearm', 'knife', 'blade', 'sword',
+    'machete', 'axe', 'bat', 'club', 'rod', 'stick', 'hammer',
+    'explosive', 'bomb', 'grenade', 'weapon', 'dagger',
+]
+_SUSPICIOUS_KEYWORDS = [
+    'suspicious', 'unidentified', 'concealed', 'sharp', 'metal object',
+    'projectile', 'ammunition', 'cartridge',
+]
+
+
+def _classify_object_category(obj_name, obj_desc):
+    """FIX #4: Classify detected objects into weapon / suspicious / environmental."""
+    combined = (obj_name + ' ' + obj_desc).lower()
+    if any(kw in combined for kw in _WEAPON_KEYWORDS):
+        return 'weapon'
+    if any(kw in combined for kw in _SUSPICIOUS_KEYWORDS):
+        return 'suspicious'
+    return 'environmental'
+
+
 def _build_weapons_objects(objects):
-    """Build weapons/objects detection table with confidence levels."""
+    """Build weapons/objects detection table with classification.
+
+    FIX #4: Objects are now classified as weapon / suspicious / environmental
+    so furniture and benign items are not listed under weapon detection.
+    """
     if not objects or len(objects) == 0:
         return [{
             'index': 1,
             'object': 'None Detected',
+            'category': 'none',
             'description': 'No object visually consistent with a weapon is clearly observable in the analyzed frames.',
             'timestamp': 'N/A',
             'confidence_level': 'N/A',
@@ -659,17 +751,21 @@ def _build_weapons_objects(objects):
 
     enriched = []
     for i, obj in enumerate(objects):
-        # Convert confidence level string to percentage
         conf_level = obj.get('confidence_level', obj.get('confidence', 'medium'))
         if isinstance(conf_level, str):
             conf_percent = CONFIDENCE_LEVEL_MAP.get(conf_level.lower(), 75)
         else:
             conf_percent = conf_level if isinstance(conf_level, (int, float)) else 75
 
+        obj_name = obj.get('object', 'Unknown')
+        obj_desc = obj.get('description', obj.get('relevance', ''))
+        category = _classify_object_category(obj_name, obj_desc)
+
         enriched.append({
             'index': i + 1,
-            'object': obj.get('object', 'Unknown'),
-            'description': obj.get('description', obj.get('relevance', '')),
+            'object': obj_name,
+            'category': category,
+            'description': obj_desc,
             'timestamp': obj.get('timestamp', 'N/A'),
             'confidence_level': conf_level if isinstance(conf_level, str) else 'medium',
             'confidence_percent': conf_percent,
@@ -680,16 +776,34 @@ def _build_weapons_objects(objects):
 
 
 def _build_evidence_frame_index(frames, analysis, frame_map=None):
-    """Build evidence frame index (F1, F2, F3…) referenced by other sections."""
+    """Build evidence frame index (F1, F2, F3…) referenced by other sections.
+
+    FIX #3: Each frame is tagged as 'referenced' or 'additional' so the
+    appendix clearly distinguishes key evidence from extra extracted frames.
+    FIX #9: Uses the same frame-resolution logic as timeline/phases/persons
+    to keep frame IDs and timestamps consistent.
+    """
     if not frames:
         return []
 
+    # Collect all frame IDs that are actually referenced in any section
+    referenced_ids = set()
+    linked_sections = [
+        'violations', 'accidents', 'number_plates', 'human_faces',
+        'timeline_events', 'timeline', 'persons', 'incident_phases',
+    ]
+    for section_key in linked_sections:
+        for item in analysis.get(section_key, []):
+            raw_fid = item.get('frame_id', item.get('evidence_frame', ''))
+            resolved = frame_map.get(raw_fid, raw_fid) if frame_map else raw_fid
+            if resolved and resolved in frames:
+                referenced_ids.add(resolved)
+
     index = []
     for i, (frame_id, frame_data) in enumerate(frames.items()):
-        # Find what was detected in this frame
         findings = []
-        
-        # V2.1: Priority to short findings from Gemini
+
+        # Short findings from timeline
         timeline = analysis.get('timeline_events', analysis.get('timeline', []))
         for event in timeline:
             resolved_frame = _resolve_frame_reference(
@@ -701,20 +815,22 @@ def _build_evidence_frame_index(frames, analysis, frame_map=None):
             if resolved_frame == frame_id or event.get('evidence_frame') == f'F{i+1}':
                 if event.get('short_finding'):
                     findings.append(event.get('short_finding'))
-        
-        # Fallback to automated mapping if findings still empty
+
+        # Fallback to section-level mapping
         if not findings:
             for section_name in ['violations', 'accidents', 'number_plates', 'human_faces', 'persons']:
                 for item in analysis.get(section_name, []):
                     if item.get('frame_id') == frame_id:
                         findings.append(item.get('description', item.get('type', 'Detection')))
 
+        is_referenced = frame_id in referenced_ids or len(findings) > 0
         index.append({
             'frame_ref': f'F{i + 1}',
             'frame_id': frame_id,
             'timestamp': frame_data.get('timestamp_formatted', '00:00:00'),
             'description': frame_data.get('description', ''),
             'findings': findings,
+            'status': 'Referenced in analysis' if is_referenced else 'Additional extracted frame',
         })
     return index
 
@@ -788,20 +904,45 @@ def _build_confidence_matrix(matrix):
 
     converted = {}
     for detection_type, value in matrix.items():
-        label = 'Unknown'
-        percent = 75
-        
+        label = None
+        percent = None
+
         if isinstance(value, str):
             label = value.capitalize()
-            percent = CONFIDENCE_LEVEL_MAP.get(value.lower(), 75)
+            percent = CONFIDENCE_LEVEL_MAP.get(value.lower())
         elif isinstance(value, (int, float)):
             percent = int(value)
-            if percent >= 85: label = 'High'
-            elif percent >= 70: label = 'Medium'
-            else: label = 'Low'
-            
+            label = None  # derive below
+        elif isinstance(value, dict):
+            label = value.get('label', '').capitalize() if value.get('label') else None
+            percent = value.get('percent')
+
+        # FIX #5: Never show "UNKNOWN" with a numeric percentage
+        if percent is not None and percent > 0:
+            # Derive label from percentage if not explicitly set
+            if not label or label.lower() == 'unknown':
+                if percent >= 85:
+                    label = 'High'
+                elif percent >= 70:
+                    label = 'Medium'
+                else:
+                    label = 'Low'
+        elif label and label.lower() != 'unknown' and percent is None:
+            # Derive percentage from label, but ONLY if it's a recognized level
+            mapped_percent = CONFIDENCE_LEVEL_MAP.get(label.lower())
+            if mapped_percent is not None and mapped_percent > 0:
+                percent = mapped_percent
+            else:
+                # Unrecognized string — treat as unknown
+                label = 'Unknown'
+                percent = None
+        else:
+            # Truly unknown — don't fabricate numbers
+            label = 'Unknown'
+            percent = None
+
         converted[detection_type] = {
-            'label': label,
+            'label': label or 'Unknown',
             'percent': percent
         }
     return converted
@@ -817,13 +958,29 @@ def _build_risk_assessment(risk):
 
 
 def _build_ai_processing_disclosure():
-    """Build AI processing disclosure statement."""
+    """Build AI processing disclosure statement.
+
+    FIX #6: Rewritten for legal accuracy. The previous wording
+    (\"No evidence data is stored\") was misleading because temporary
+    processing does occur. The revised text explicitly describes:
+    - Temporary volatile-memory processing
+    - External AI transmission with retention policy
+    - No persistent storage after session ends
+    """
     return (
-        'Evidence media was analyzed using an external AI multimodal vision model '
-        '(Google Gemini). Media was transmitted temporarily to the AI service for '
-        'analysis and was deleted from the AI provider\'s servers immediately after '
-        'processing. The AI service does not retain or store any evidence data. '
-        'No evidence data is stored by this platform.'
+        'Evidence media was processed by this platform temporarily in volatile '
+        'memory (RAM) for the purpose of forensic analysis and report generation. '
+        'During processing, the evidence file was transmitted to an external AI '
+        'multimodal vision service (Google Gemini) for automated analysis. The '
+        'AI service provider processes the file in accordance with its data '
+        'handling policy and does not retain evidence data after analysis '
+        'completion. '
+        'This platform does not persist any evidence files, extracted frames, '
+        'analysis results, or generated reports to durable storage. All '
+        'processing artifacts are held exclusively in volatile memory and are '
+        'destroyed automatically upon report delivery and session expiry. '
+        'No evidence data remains on this platform or on the AI service '
+        'provider\'s infrastructure after processing is complete.'
     )
 
 
@@ -831,23 +988,62 @@ def _build_chain_of_processing():
     """Build chain of processing / evidence handling statement."""
     return {
         'statement': (
-            'The uploaded media file was processed entirely in volatile memory. '
-            'No copy of the evidence file, extracted frames, or analysis results '
-            'are stored in persistent storage by this platform. All processing '
-            'artifacts are destroyed after report generation and session expiry.'
+            'The uploaded media file was processed entirely in volatile memory '
+            '(RAM). No copy of the evidence file, extracted frames, or analysis '
+            'results are written to persistent storage (disk) by this platform. '
+            'All processing artifacts exist only in RAM and are destroyed after '
+            'report generation and session expiry. External AI services receive '
+            'the file temporarily for analysis under their data-handling policy.'
         ),
         'processing_steps': [
-            'Evidence file uploaded to in-memory buffer',
+            'Evidence file received and held in volatile memory (RAM)',
             'SHA-256 hash computed for integrity verification',
-            'Media metadata extracted (resolution, codec, duration)',
-            'Video uploaded to AI service for multimodal analysis',
-            'AI analysis results received as structured JSON',
-            'Structured forensic report compiled from analysis',
-            'PDF report generated in-memory',
-            'Evidence file deleted from AI service servers',
-            'All in-memory artifacts scheduled for automatic cleanup',
+            'Media metadata extracted in-memory (resolution, codec, duration)',
+            'Key frames extracted to in-memory buffers',
+            'Evidence file transmitted to AI service for multimodal analysis',
+            'AI analysis results received as structured JSON (in-memory)',
+            'Structured forensic report compiled from analysis (in-memory)',
+            'PDF report generated in-memory and delivered to requester',
+            'AI service provider deletes evidence per retention policy',
+            'All in-memory artifacts destroyed upon session expiry',
         ],
     }
 
 
+def _detect_broadcast_source(raw_analysis):
+    """Detect if the media contains broadcast overlays or news footage.
 
+    Scans the executive summary, scene description, observations, and
+    key evidence observations for keywords that suggest the source is
+    a news broadcast rather than primary surveillance footage.
+    """
+    searchable_texts = []
+    searchable_texts.append(str(raw_analysis.get('executive_summary', '')))
+    scene = raw_analysis.get('scene_description', {})
+    if isinstance(scene, dict):
+        searchable_texts.append(str(scene.get('environment', '')))
+    else:
+        searchable_texts.append(str(scene))
+    searchable_texts.append(str(raw_analysis.get('forensic_observations', '')))
+    for obs in raw_analysis.get('key_evidence_observations', []):
+        searchable_texts.append(str(obs))
+    # Also scan timeline events
+    for evt in raw_analysis.get('timeline_events', raw_analysis.get('timeline', [])):
+        searchable_texts.append(str(evt.get('event', '')))
+
+    combined = ' '.join(searchable_texts).lower()
+    detected_keywords = [kw for kw in _BROADCAST_KEYWORDS if kw in combined]
+
+    if detected_keywords:
+        return [{
+            'type': 'broadcast_source',
+            'severity': 'warning',
+            'message': (
+                'Detected broadcast overlay graphics (keywords: '
+                + ', '.join(detected_keywords)
+                + '). This media may originate from a news broadcast rather '
+                'than a primary surveillance source. Investigators should '
+                'verify the provenance of this evidence file.'
+            ),
+        }]
+    return []

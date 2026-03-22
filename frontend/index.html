@@ -4,16 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="alfa-hawk-api-base" content="https://web-production-4c3f2.up.railway.app">
+    <meta name="alfa-hawk-api-base" content="">
     <title>Alfa Hawk — Professional AI Forensic Workstation</title>
     <meta name="description"
         content="Alfa Hawk: Professional AI-powered forensic evidence analysis workstation. Advanced reconstruction, detection, and reporting for investigators.">
     <link rel="icon" type="image/png" href="assets/logo.png">
     <link rel="apple-touch-icon" href="assets/logo.png">
     <link rel="stylesheet" href="styles.css">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
-        rel="stylesheet">
+    <!-- Institutional Fonts: IBM Plex Suite -->
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 
 <body class="workstation-theme">
@@ -25,8 +24,8 @@
                 <img src="assets/logo.png" alt="Alfa Hawk Logo">
             </div>
             <div class="brand-info">
-                <h1>Alfa Hawk</h1>
-                <span class="platform-subtitle">Professional Forensic Evidence Workstation</span>
+                <h1>ALFA HAWK</h1>
+                <span class="platform-subtitle">Forensic Investigation Workstation</span>
             </div>
         </div>
 
@@ -49,6 +48,11 @@
                 <span class="pulse-dot"></span>
                 <span>Privacy Mode: In-Memory Only</span>
             </div>
+            
+            <div class="mode-toggle">
+                <button id="mode-investigation" class="mode-btn active" onclick="window.__switchViewMode('investigation')">Investigation</button>
+                <button id="mode-report" class="mode-btn" onclick="window.__switchViewMode('report')">Report Mode</button>
+            </div>
         </div>
     </header>
 
@@ -56,7 +60,7 @@
         <!-- ═══ SIDEBAR: INGESTION & CONFIG ═══ -->
         <aside id="sidebar">
             <div class="sidebar-section">
-                <h3 class="sidebar-title">📁 Evidence Ingestion</h3>
+                <h3 class="sidebar-title">EVIDENCE</h3>
                 
                 <div id="drop-zone" class="drop-zone">
                     <div class="drop-zone-icon">
@@ -98,7 +102,7 @@
             </div>
 
             <div class="sidebar-section">
-                <h3 class="sidebar-title">📝 Investigation Metadata</h3>
+                <h3 class="sidebar-title">CASE</h3>
                 <div class="meta-fields">
                     <div class="input-group">
                         <label>Case Number</label>
@@ -116,7 +120,7 @@
             </div>
 
             <div class="sidebar-section">
-                <h3 class="sidebar-title">🧠 Analysis Configuration</h3>
+                <h3 class="sidebar-title">ANALYSIS MODE</h3>
                 <div class="mode-selector">
                     <label class="radio-card">
                         <input type="radio" name="analysisMode" value="platform" checked>
@@ -142,16 +146,16 @@
             </div>
 
             <div class="sidebar-footer">
-                <button id="analyzeBtn" class="btn btn-primary full-width" disabled>
-                    <span>🔍</span> Analyze Evidence
+                <button id="analyzeBtn" class="btn btn-primary full-width" disabled data-disabled-text="Upload evidence to continue">
+                    Analyze Evidence
                 </button>
             </div>
         </aside>
 
         <div id="sidebar-resizer" class="resizer-handle"></div>
 
-        <!-- ═══ MAIN WORKSPACE ═══ -->
-        <main id="workspace">
+        <!-- ═══ CENTER COLUMN: Frame Viewer + Timeline + Events ═══ -->
+        <main id="center-column">
 
             <!-- 1. EMPTY STATE / INITIAL VIEW -->
             <div id="view-initial" class="workspace-view">
@@ -167,8 +171,9 @@
             <!-- 2. PROGRESS VIEW -->
             <div id="view-progress" class="workspace-view" style="display: none;">
                 <div class="progress-header">
-                    <h2>⏳ Analysis in Progress</h2>
+                    <h2>Analysis in Progress</h2>
                     <p id="progress-message">Initializing forensic pipeline....</p>
+                    <p class="trust-signal">Processing in memory. No data is stored.</p>
                 </div>
                 
                 <div class="master-progress">
@@ -178,164 +183,174 @@
                 <div class="forensic-steps">
                     <div class="f-step" data-step="validate">
                         <div class="f-step-icon">1</div>
-                        <div class="f-step-label">Validating evidence file</div>
+                        <div class="f-step-info">
+                            <div class="f-step-label">Validating evidence</div>
+                            <div class="f-step-pct" data-step-pct="validate"></div>
+                        </div>
                     </div>
                     <div class="f-step" data-step="extract">
                         <div class="f-step-icon">2</div>
-                        <div class="f-step-label">Extracting key frames</div>
+                        <div class="f-step-info">
+                            <div class="f-step-label">Extracting frames</div>
+                            <div class="f-step-pct" data-step-pct="extract"></div>
+                        </div>
                     </div>
                     <div class="f-step" data-step="upload">
                         <div class="f-step-icon">3</div>
-                        <div class="f-step-label">Uploading media to AI</div>
+                        <div class="f-step-info">
+                            <div class="f-step-label">Uploading to AI</div>
+                            <div class="f-step-pct" data-step-pct="upload"></div>
+                        </div>
                     </div>
                     <div class="f-step" data-step="analyze">
                         <div class="f-step-icon">4</div>
-                        <div class="f-step-label">Analyzing scene & objects</div>
+                        <div class="f-step-info">
+                            <div class="f-step-label">Analyzing scene</div>
+                            <div class="f-step-pct" data-step-pct="analyze"></div>
+                        </div>
                     </div>
                     <div class="f-step" data-step="reconstruct">
                         <div class="f-step-icon">5</div>
-                        <div class="f-step-label">Reconstructing timeline</div>
+                        <div class="f-step-info">
+                            <div class="f-step-label">Reconstructing timeline</div>
+                            <div class="f-step-pct" data-step-pct="reconstruct"></div>
+                        </div>
                     </div>
                     <div class="f-step" data-step="report">
                         <div class="f-step-icon">6</div>
-                        <div class="f-step-label">Generating forensic report</div>
+                        <div class="f-step-info">
+                            <div class="f-step-label">Generating report</div>
+                            <div class="f-step-pct" data-step-pct="report"></div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 3. RESULTS DASHBOARD -->
+            <!-- 3. INVESTIGATION VIEW (3-column active state) -->
             <div id="view-results" class="workspace-view" style="display: none;">
-                <nav class="dashboard-tabs">
-                    <button class="tab-btn active" data-tab="overview">Overview</button>
-                    <button class="tab-btn" data-tab="timeline">Timeline</button>
-                    <button class="tab-btn" data-tab="persons">Persons</button>
-                    <button class="tab-btn" data-tab="objects">Objects</button>
-                    <button class="tab-btn" data-tab="frames">Evidence Frames</button>
-                    <button class="tab-btn export-tab" data-tab="export">Export</button>
-                </nav>
 
-                <div class="tab-content-container">
-                    <!-- OVERVIEW TAB -->
-                    <div id="tab-overview" class="tab-content active">
-                        <div id="report-header-preview"></div>
-                        <div class="dashboard-grid">
-                            <div class="grid-card main-summary">
-                                <h3>Executive Summary</h3>
-                                <p id="summary-text" class="summary-body"></p>
-                            </div>
-                            <div class="grid-card threat-level">
-                                <h3>Indicative Threat Level</h3>
-                                <div id="threat-indicator" class="threat-box">--</div>
-                            </div>
-                            <div class="grid-card evidence-metadata">
-                                <h3>Forensic Metadata</h3>
-                                <div id="forensic-meta-list" class="meta-list"></div>
-                            </div>
+                <!-- INLINE FRAME VIEWER -->
+                <div id="frame-viewer-container" class="frame-viewer-inline">
+                    <!-- State: Empty -->
+                    <div id="fv-empty" class="fv-state active">
+                        <div class="fv-placeholder">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                            <span>Select an event to view the evidence frame</span>
                         </div>
                     </div>
-
-                    <!-- TIMELINE TAB -->
-                    <div id="tab-timeline" class="tab-content">
-                        <h3>Forensic Timeline Reconstruction</h3>
-                        
-                        <!-- Timeline Scrubber UI -->
-                        <div class="timeline-scrubber-container">
-                            <div class="scrubber-track">
-                                <div id="scrubber-progress" class="scrubber-fill"></div>
-                                <div id="scrubber-handle" class="scrubber-handle"></div>
-                                <div id="timeline-markers" class="timeline-markers"></div>
-                            </div>
-                            <div class="scrubber-labels">
-                                <span id="scrubber-start">00:00</span>
-                                <span id="scrubber-end">--:--</span>
-                            </div>
-                        </div>
-
-                        <p class="tab-intro">Interactive event chain with linked evidence exhibits. Select any node or frame preview to inspect the source frame.</p>
-                        <div id="timeline-list" class="timeline-forensic-list"></div>
+                    <!-- State: Loading -->
+                    <div id="fv-loading" class="fv-state" style="display:none;">
+                        <div class="fv-placeholder"><span class="fv-spinner"></span> Fetching frame...</div>
                     </div>
-
-                    <!-- PERSONS TAB -->
-                    <div id="tab-persons" class="tab-content" style="display:none;">
-                        <h3>Detected Persons of Interest</h3>
-                        <div id="persons-table-container">
-                            <!-- Populated by script.js with .investigation-table -->
+                    <!-- State: Missing -->
+                    <div id="fv-missing" class="fv-state" style="display:none;">
+                        <div class="fv-placeholder">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>
+                            <span>Frame data absent</span>
                         </div>
                     </div>
-
-                    <!-- OBJECTS TAB -->
-                    <div id="tab-objects" class="tab-content">
-                        <h3>Inventory of Detected Objects</h3>
-                        <div id="objects-registry-container">
-                            <!-- Categorized tables will be injected here -->
+                    <!-- State: Active Frame -->
+                    <div id="fv-active" class="fv-state" style="display:none;">
+                        <img id="fv-image" src="" alt="Evidence Frame">
+                        <div class="fv-overlay fv-top-left">
+                            <span id="fv-frame-id" class="fv-badge fv-badge-amber">FRAME --</span>
                         </div>
-                    </div>
-
-                    <!-- FRAMES TAB -->
-                    <div id="tab-frames" class="tab-content">
-                        <h3>Extracted Evidence Exhibits</h3>
-                        <div id="frames-grid" class="frames-grid-v2"></div>
-                    </div>
-
-                    <!-- EXPORT TAB -->
-                    <div id="tab-export" class="tab-content">
-                        <div class="export-workspace">
-                            <h2>Investigation Report Console</h2>
-                            
-                            <div class="report-status-dashboard">
-                                <div class="status-metric">
-                                    <span class="metric-label">Report Status</span>
-                                    <span id="export-status" class="metric-value">READY</span>
-                                </div>
-                                <div class="status-metric">
-                                    <span class="metric-label">Analysis Confidence</span>
-                                    <span id="export-confidence" class="metric-value">--%</span>
-                                </div>
-                                <div class="status-metric">
-                                    <span class="metric-label">Evidence Exhibits</span>
-                                    <span id="export-frames" class="metric-value">0</span>
-                                </div>
-                            </div>
-
-                            <div class="export-actions-grid">
-                                <button id="downloadPdfBtn" class="btn btn-primary export-btn">
-                                    <span class="btn-icon">📄</span>
-                                    <div class="btn-text">
-                                        <span class="btn-title">Certified Forensic Report</span>
-                                        <span class="btn-sub">Download structured PDF (Certified)</span>
-                                    </div>
-                                </button>
-                                <button id="downloadJsonBtn" class="btn btn-secondary export-btn">
-                                    <span class="btn-icon">📦</span>
-                                    <div class="btn-text">
-                                        <span class="btn-title">Raw Analysis Data</span>
-                                        <span class="btn-sub">Export JSON dataset & hashes</span>
-                                    </div>
-                                </button>
-                                <button id="downloadFramesBtn" class="btn btn-secondary export-btn">
-                                    <span class="btn-icon">📸</span>
-                                    <div class="btn-text">
-                                        <span class="btn-title">Evidence Assets ZIP</span>
-                                        <span class="btn-sub">All high-resolution frame exhibits</span>
-                                    </div>
-                                </button>
-                            </div>
+                        <div class="fv-overlay fv-top-right">
+                            <span id="fv-timestamp" class="fv-badge fv-badge-mono">00:00</span>
+                            <span id="fv-confidence" class="fv-badge fv-badge-confidence">--</span>
                         </div>
+                        <div class="fv-overlay fv-bottom">
+                            <span id="fv-event-title" class="fv-event-label"></span>
+                        </div>
+                        <!-- Nav arrows -->
+                        <button id="fv-prev" class="fv-nav fv-nav-prev" title="Previous frame">&#8249;</button>
+                        <button id="fv-next" class="fv-nav fv-nav-next" title="Next frame">&#8250;</button>
                     </div>
+                </div>
+
+                <!-- TIMELINE STRIP (minimal navigation) -->
+                <div id="timeline-strip" class="timeline-strip">
+                    <div class="timeline-strip-track">
+                        <div id="timeline-dots" class="timeline-dots"></div>
+                    </div>
+                    <div class="timeline-strip-labels">
+                        <span id="ts-start" class="mono-tech">00:00</span>
+                        <span id="ts-end" class="mono-tech">--:--</span>
+                    </div>
+                </div>
+
+                <!-- EVENT LIST (detailed, scrollable) -->
+                <div id="event-list-container" class="event-list-container">
+                    <div id="event-list" class="event-list"></div>
                 </div>
             </div>
 
             <!-- ERROR VIEW -->
             <div id="view-error" class="workspace-view" style="display: none;">
                 <div class="error-panel">
-                    <div class="error-panel-icon">⚠️</div>
-                    <h3>Forensic Analysis Interrupted</h3>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <h3>Analysis Failed</h3>
                     <p id="error-message">An unexpected error occurred during processing.</p>
                     <button id="retryBtn" class="btn btn-primary">Restart Workflow</button>
                 </div>
             </div>
 
+            <!-- REPORT VIEW -->
+            <div id="view-report" class="workspace-view" style="display: none;">
+                <div id="report-container" class="report-container">
+                    <!-- Report Mode Content (Phase 4) -->
+                </div>
+            </div>
+
         </main>
+
+        <!-- ═══ RIGHT PANEL: Evidence & Context ═══ -->
+        <aside id="evidence-panel" class="evidence-panel">
+            <h3 class="sidebar-title">EVIDENCE</h3>
+
+            <!-- AI Observation -->
+            <div class="ep-section" id="ep-observation">
+                <span class="ep-label">AI Analysis</span>
+                <p id="ep-observation-text" class="ep-body">Select an event to see the AI observation.</p>
+            </div>
+
+            <!-- Interaction: Mark + Note -->
+            <div class="ep-section ep-actions">
+                <label class="ep-checkbox">
+                    <input type="checkbox" id="ep-important"> Mark as Important
+                </label>
+                <div class="ep-note-group">
+                    <label for="ep-note" class="ep-label">Add Note</label>
+                    <textarea id="ep-note" rows="2" placeholder="Investigator notes..."></textarea>
+                </div>
+            </div>
+
+            <!-- Linked Frames -->
+            <div class="ep-section" id="ep-linked-frames">
+                <span class="ep-label">Linked Frames</span>
+                <div id="ep-frames-row" class="ep-frames-row"></div>
+            </div>
+
+            <!-- Reference Drawer (Persons, Objects, Frames) -->
+            <details class="ep-reference-drawer">
+                <summary class="ep-label">Reference Data</summary>
+                <div class="ep-ref-tabs">
+                    <button class="ep-ref-tab active" data-ref="persons">Persons</button>
+                    <button class="ep-ref-tab" data-ref="objects">Objects</button>
+                    <button class="ep-ref-tab" data-ref="frames">Frames</button>
+                </div>
+                <div id="ep-ref-content" class="ep-ref-content">
+                    <div id="ref-persons" class="ep-ref-pane active"></div>
+                    <div id="ref-objects" class="ep-ref-pane" style="display:none;"></div>
+                    <div id="ref-frames" class="ep-ref-pane" style="display:none;"></div>
+                </div>
+            </details>
+
+            <!-- Sticky Footer -->
+            <div class="ep-footer">
+                <button id="downloadPdfBtn" class="btn btn-primary full-width">Generate Report</button>
+            </div>
+        </aside>
     </div>
 
     <!-- ═══ APP FOOTER ═══ -->

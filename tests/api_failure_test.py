@@ -16,11 +16,18 @@ class TestAPIFailure(unittest.TestCase):
         mock_provider.analyze_video.side_effect = Exception("Deadline Exceeded")
         
         engine = EvidenceEngine(ai_provider=mock_provider)
-        # engine.analyze should handle the exception and return an error status
-        # but in our implementation, the engine might raise or handle it.
-        # Let's verify it propagates or handles it as expected.
-        with self.assertRaises(Exception):
-            engine.analyze_video(b"dummy", "test.mp4", {}, None)
+        with patch("backend.engine.evidence_engine.get_media_metadata", return_value={"filename": "test.mp4"}), \
+             patch("backend.engine.evidence_engine.extract_key_frames", return_value={}), \
+             patch("backend.engine.evidence_engine.build_forensic_report", return_value={"header": {"report_id": "RPT-TEST"}}), \
+             patch.object(engine, "_pre_check_analysis", return_value=None):
+            with self.assertRaises(Exception):
+                engine.run_analysis(
+                    file_bytes=b"dummy-bytes",
+                    filename="test.mp4",
+                    case_data={},
+                    api_key=None,
+                    progress_callback=None,
+                )
 
     def test_malformed_json_handling(self):
         # Handled by _validate_and_fill_defaults

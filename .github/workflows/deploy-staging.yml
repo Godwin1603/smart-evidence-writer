@@ -1,0 +1,21 @@
+name: Deploy (Staging)
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Deploy disabled by default
+        run: |
+          echo "Staging deployment is intentionally not implemented in-repo."
+          echo "Configure your hosting provider (Render/Railway) to deploy staging from the dev branch,"
+          echo "or add a deployment step here using provider tokens stored as GitHub Secrets."
+
